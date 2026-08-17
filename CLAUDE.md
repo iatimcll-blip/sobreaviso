@@ -11,7 +11,12 @@ construído em 5 fases (ver `README.md` para o status atual e o plano completo s
 ## Stack e convenções
 
 - Frontend: React 19 + React Router 7 (SPA declarativa, `src/app/router.tsx`), TypeScript estrito.
-- Backend: Cloudflare Workers com Hono (`server/index.ts`), banco D1 (SQLite), arquivos em R2.
+- Backend: Hono (`server/index.ts`) hospedado na Vercel (runtime Node, função serverless em
+  `api/[[...route]].ts` — **não** Edge, porque o driver Postgres precisa de socket TCP), banco
+  Postgres no Supabase, arquivos no Supabase Storage. `c.env.DB`/`c.env.BUCKET` continuam com a
+  mesma superfície de sempre (`prepare/bind/all/first/run`, `put/get`) através dos adaptadores em
+  `server/db/postgresAdapter.ts` e `server/lib/supabaseStorageAdapter.ts` — ao mexer numa rota ou
+  query existente, trate `db`/`bucket` exatamente como antes, sem se preocupar com o backend real.
 - Todas as dependências são versões fixas (sem `^`/`latest`) — ao adicionar uma nova, fixe a versão
   exata resolvida.
 - `shared/` não pode importar nada de `server/` ou `src/` — é código puro, sem I/O, usado dos dois
@@ -22,8 +27,9 @@ construído em 5 fases (ver `README.md` para o status atual e o plano completo s
 ## Autenticação e autorização
 
 - Sessão: cookie httpOnly com token opaco; o banco (`sessions`) guarda só o hash SHA-256 do token.
-- Senha: PBKDF2-SHA256 via Web Crypto (`server/services/auth/hash.ts`) — Workers não tem
-  bcrypt/scrypt nativos.
+- Senha: PBKDF2-SHA256 via Web Crypto (`server/services/auth/hash.ts`) — mantido mesmo fora do
+  Workers (o motivo original) porque `crypto.subtle` já é nativo no runtime Node da Vercel também;
+  não há necessidade de trocar para bcrypt/scrypt.
 - RBAC: `server/middleware/rbac.ts` é a única fonte de decisão de autorização. Administrador tem
   acesso total (hard-coded). Usuário comum depende de `user_permissions` (por tela, negado por
   padrão se não houver registro). O frontend (`src/lib/permissions.ts`) espelha o mesmo mapa
@@ -45,23 +51,39 @@ autoritativa no servidor), e cada tipo de importação (ex.: `colaboradoresDefin
 aba/colunas/parser/chave de duplicidade. Ao adicionar um novo tipo de importação (ex.: feriados na
 Fase 3), siga esse mesmo padrão em vez de duplicar lógica de parsing.
 
-Fluxo em duas etapas, sempre: `POST /api/importacoes/:tipo/preview` (grava o arquivo bruto no R2 e
-devolve prévia) → `POST /api/importacoes/:tipo/confirmar` (relê do R2, revalida, grava no D1). Nunca
-persista com base só no parse feito no navegador.
+Fluxo em duas etapas, sempre: `POST /api/importacoes/:tipo/preview` (grava o arquivo bruto no
+Supabase Storage e devolve prévia) → `POST /api/importacoes/:tipo/confirmar` (relê do Storage,
+revalida, grava no Postgres). Nunca persista com base só no parse feito no navegador.
 
 ## Banco de dados
 
-- Migrations em `migrations/`, uma por fase, aplicadas via `wrangler d1 migrations apply` (não
-  existe um migration runner customizado).
-- D1 aplica constraints de `FOREIGN KEY` e `UNIQUE` de verdade — colunas `UNIQUE` opcionais (como
-  `colaboradores.matricula`) precisam normalizar string vazia para `NULL` na validação (Zod), senão
-  a segunda linha com valor vazio quebra a constraint.
-- **`UNIQUE`/`INSERT OR IGNORE` não protege contra duplicidade quando as colunas da constraint podem
-  ser `NULL`** (SQL trata `NULL != NULL`, ex.: `feriados.uf_sigla`/`localidade_id` em feriados
-  nacionais). Nesses casos, faça uma checagem explícita antes do insert usando o operador `IS`
-  (NULL-safe) em vez de `=` — ver `server/db/queries/feriados.ts::criarFeriado`.
+- Postgres no Supabase. Migrations em `migrations/`, uma por fase, aplicadas via `npm run
+  db:migrate` (`scripts/migrate.ts`, idempotente — registra o que já rodou numa tabela
+  `_migrations`, não existe mais o runner do `wrangler d1`).
+- **SQL é escrito em sintaxe SQLite-compatível de propósito** (placeholders `?`, sem `$1`/`$2`) —
+  `server/db/postgresAdapter.ts` traduz os placeholders e mantém a mesma superfície D1 (`.meta.last_row_id`
+  via `RETURNING id` sintético). Ao escrever uma query nova, ainda assim tome cuidado com sintaxe
+  que SQLite tolera e Postgres não: `datetime('now')` funciona (função de compatibilidade criada na
+  migration 0001), mas `date('now')` **não** — colide com o cast nativo do Postgres; use
+  `to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD')` diretamente. `INSERT OR IGNORE` também não
+  existe — use `ON CONFLICT ... DO NOTHING`.
+- Postgres aplica constraints de `FOREIGN KEY` e `UNIQUE` de verdade (como o D1 antes) — colunas
+  `UNIQUE` opcionais (como `colaboradores.matricula`) precisam normalizar string vazia para `NULL`
+  na validação (Zod), senão a segunda linha com valor vazio quebra a constraint. Diferente do
+  SQLite, o Postgres também **valida a existência da tabela referenciada no momento do
+  `CREATE TABLE`/`ALTER TABLE`** — ao criar uma migration nova com referência circular entre
+  tabelas, crie a FK problemática só depois via `ALTER TABLE ... ADD CONSTRAINT` (ver o padrão
+  `equipes`/`colaboradores` na migration 0001).
+- **`UNIQUE` não protege contra duplicidade quando as colunas da constraint podem ser `NULL`** (SQL
+  trata `NULL != NULL`, ex.: `feriados.uf_sigla`/`localidade_id` em feriados nacionais). Nesses
+  casos, faça uma checagem explícita antes do insert usando `IS NOT DISTINCT FROM` (equivalente
+  Postgres do `IS` NULL-safe do SQLite) em vez de `=` — ver `server/db/queries/feriados.ts::criarFeriado`.
 - Consultas em `server/db/queries/*.ts`: uma função por operação, sempre mapeando `snake_case` do
   banco para `camelCase` dos tipos em `shared/types/`.
+- O client Postgres (`server/db/postgresAdapter.ts`) usa `prepare: false` — o "Transaction pooler"
+  do Supabase não garante a mesma conexão física entre idas ao servidor, e prepared statements
+  (padrão do driver `postgres`) travam/falham de forma imprevisível nesse modo. Não reative sem
+  motivo forte.
 
 ## Validação de entrada nas rotas
 
@@ -97,7 +119,7 @@ genérica de erro, escondendo qual campo era inválido. O wrapper `validar` já 
 - `server/services/export/xlsxExportService.ts::gerarPlanilha` monta o workbook a partir de arrays
   de objetos simples (`Record<string, string|number>`, chaves = cabeçalho da coluna em português) —
   não crie uma camada de definição de colunas como a de importação, não é necessária aqui.
-- Toda exportação grava uma cópia no R2 e um registro em `export_historico` **e** devolve o arquivo
+- Toda exportação grava uma cópia no Supabase Storage e um registro em `export_historico` **e** devolve o arquivo
   para download imediato (não é um ou outro). O download real no navegador é feito por
   `api.baixarArquivo` (`src/lib/api-client.ts`), que lê o nome do arquivo do header
   `Content-Disposition` — as outras funções de `api` (`get`/`post`/...) assumem resposta JSON e não
@@ -109,11 +131,18 @@ genérica de erro, escondendo qual campo era inválido. O wrapper `validar` já 
 ## Testes e verificação
 
 - `npm run typecheck` (tsc nativo/Go — nota: `moduleResolution` precisa ser `"Bundler"`; se aparecer
-  erro de `react/jsx-runtime` não encontrado, primeiro apague os `.tsbuildinfo` antes de investigar
-  mais a fundo — costuma ser cache incremental corrompido, não um erro real).
+  erro de tipo que não bate com uma edição recente (ex.: `react/jsx-runtime` não encontrado, ou um
+  campo que você acabou de adicionar a uma interface "não existe"), primeiro apague os
+  `*.tsbuildinfo` antes de investigar mais a fundo — costuma ser cache incremental corrompido, não
+  um erro real).
 - `npm run test` (Vitest) — priorize testes para `shared/calculo/*` (motor de regras, maior risco) e
   `shared/import/*`.
-- Para testar a API localmente: `npm run db:migrate:local`, `npm run seed:dev`, depois
-  `npm run dev:worker` (porta 8787) + `npm run dev` (porta 5173, faz proxy de `/api`).
+- Para testar a API localmente: copie `.env.example` (se existir) para `.env` com `DATABASE_URL`,
+  `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `SESSION_SECRET` — depois
+  `npm run db:migrate`, `npm run seed:dev`, `npm run dev:server` (porta 8787, roda com `tsx watch`,
+  sem depender de wrangler) + `npm run dev` (porta 5173, faz proxy de `/api`). No Windows, se o
+  `dev:server` parecer travado numa porta já em uso depois de editar um arquivo, o `tsx watch` às
+  vezes não mata o processo filho anterior — confira `netstat -ano | grep :8787` e finalize o PID
+  antigo manualmente antes de reiniciar.
 - Ao validar autorização, sempre teste também batendo direto na API com um usuário limitado (não só
   escondendo o botão na UI) — é isso que prova que o RBAC está reforçado no servidor.
