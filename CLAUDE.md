@@ -126,6 +126,13 @@ revalida, grava no Postgres). Nunca persista com base só no parse feito no nave
   trata `NULL != NULL`, ex.: `feriados.uf_sigla`/`localidade_id` em feriados nacionais). Nesses
   casos, faça uma checagem explícita antes do insert usando `IS NOT DISTINCT FROM` (equivalente
   Postgres do `IS` NULL-safe do SQLite) em vez de `=` — ver `server/db/queries/feriados.ts::criarFeriado`.
+  **Nunca escreva `coluna IS ?`** (válido em SQLite, comparação NULL-safe com parâmetro) — em
+  Postgres `IS` só aceita `NULL`/`TRUE`/`FALSE`/`DISTINCT FROM <expr>` como operando direito, nunca
+  um bind parameter, e quebra com "syntax error at or near \"$N\"" em runtime (não pega no
+  typecheck, já que é só uma string SQL) — sempre `IS NOT DISTINCT FROM ?` mesmo quando a coluna
+  pode ser `NULL` (ver o bug corrigido em `server/db/queries/inconsistencias.ts::buscarPorChaveNatural`,
+  que travava a engine de cálculo inteira sempre que uma regra por colaborador — sem `equipeId` —
+  precisava conciliar contra o que já existia).
 - Consultas em `server/db/queries/*.ts`: uma função por operação, sempre mapeando `snake_case` do
   banco para `camelCase` dos tipos em `shared/types/`.
 - O client Postgres (`server/db/postgresAdapter.ts`) usa `prepare: false` — o "Transaction pooler"
@@ -152,6 +159,19 @@ genérica de erro, escondendo qual campo era inválido. O wrapper `validar` já 
   funções puras, uma por regra, orquestradas por `executarRegrasColaborador` (por colaborador) e
   `detectarDuplaIncompleta` (por dupla, não é escopado por colaborador). O único lugar que toca o
   banco é `server/services/calculo/executarCalculoCiclo.ts`.
+- `shared/calculo/inconsistencias/sobreaviso.ts` valida sobreaviso contra a escala de trabalho real
+  do colaborador (que `buscarConflitos`/`criarSobreaviso` em `server/db/queries/sobreaviso.ts` **não**
+  fazem — aquilo só checa sobreposição com outros sobreavisos): `detectarSobreavisoSobrepoeTurno`
+  (não pode coincidir com um turno já escalado), `detectarInterjornadaInsuficienteSobreaviso` (reaplica
+  `config.interjornadaMinimaHoras` — Art. 66 CLT — entre o sobreaviso e o turno de trabalho mais
+  próximo, nos dois sentidos) e `detectarSobreavisoDuranteAfastamento` (não pode cair dentro de um
+  afastamento/férias). Por design essas regras só **avisam** (viram inconsistência `pendente`,
+  revisável na tela) — não bloqueiam a criação do sobreaviso; se um dia precisar bloquear, o ponto de
+  entrada é `POST /sobreaviso` em `server/routes/sobreaviso.ts`, seguindo o mesmo padrão de
+  `buscarConflitos` + `forcar`. Também herdam a mesma limitação de escopo que `detectarSobreposicaoSobreaviso`
+  já tinha: `calcularColaborador` só carrega sobreaviso lançado direto no `colaboradorId` (via
+  `listarSobreavisos(db, {colaboradorId, ...})`), não o que a pessoa herda por estar numa equipe com
+  sobreaviso atribuído a `equipeId`.
 - `shared/calculo/geradorEscala.ts::gerarTurnosAutomaticos` gera os turnos de um modelo 5x2/6x1/12x36/4x2
   a partir de horário de entrada + duração da jornada, reaplicando os **mesmos** limiares de
   `shared/calculo/inconsistencias/jornada.ts` (interjornada, intrajornada graduado, jornada máxima,

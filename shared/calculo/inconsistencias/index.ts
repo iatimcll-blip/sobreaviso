@@ -3,6 +3,11 @@ import { detectarEscalaDuranteAfastamento, detectarEscalaEmFeriadoSemConfiguraca
 import { detectarCadastroIncompleto } from './cadastro';
 import type { DadosAnaliseColaborador } from './dados';
 import { detectarDescansoSemanalInsuficiente, detectarInterjornadaInsuficiente, detectarIntrajornadaInsuficiente, detectarJornadaAcimaPermitido } from './jornada';
+import {
+  detectarInterjornadaInsuficienteSobreaviso,
+  detectarSobreavisoDuranteAfastamento,
+  detectarSobreavisoSobrepoeTurno,
+} from './sobreaviso';
 import { detectarSobreposicaoEscala, detectarSobreposicaoSobreaviso } from './sobreposicoes';
 import type { InconsistenciaDetectada } from './tipos';
 
@@ -10,6 +15,7 @@ export * from './afastamentosFeriados';
 export * from './cadastro';
 export * from './dados';
 export * from './jornada';
+export * from './sobreaviso';
 export * from './sobreposicoes';
 export * from './tipos';
 
@@ -32,5 +38,8 @@ export function executarRegrasColaborador(
     ...detectarEscalaDuranteAfastamento(dados),
     ...detectarEscalaEmFeriadoSemConfiguracao(dados),
     ...detectarCadastroIncompleto(dados.colaborador, dataReferenciaCadastro),
+    ...detectarSobreavisoSobrepoeTurno(dados),
+    ...detectarInterjornadaInsuficienteSobreaviso(dados, config),
+    ...detectarSobreavisoDuranteAfastamento(dados),
   ];
 }

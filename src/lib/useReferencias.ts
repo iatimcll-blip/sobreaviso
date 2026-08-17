@@ -20,10 +20,10 @@ export function useReferencias() {
 
   useEffect(() => {
     Promise.all([
-      api.get<{ uf: UfInfo[] }>('/referencias/uf'),
-      api.get<{ localidades: Localidade[] }>('/referencias/localidades'),
-      api.get<{ equipes: Equipe[] }>('/referencias/equipes'),
-      api.get<{ colaboradores: ColaboradorResumo[] }>('/referencias/colaboradores'),
+      api.get<{ uf: UfInfo[] }>('/referencias/uf').catch(() => ({ uf: [] as UfInfo[] })),
+      api.get<{ localidades: Localidade[] }>('/referencias/localidades').catch(() => ({ localidades: [] as Localidade[] })),
+      api.get<{ equipes: Equipe[] }>('/referencias/equipes').catch(() => ({ equipes: [] as Equipe[] })),
+      api.get<{ colaboradores: ColaboradorResumo[] }>('/referencias/colaboradores').catch(() => ({ colaboradores: [] as ColaboradorResumo[] })),
     ])
       .then(([respUf, respLocalidades, respEquipes, respColaboradores]) => {
         setUf(respUf.uf);

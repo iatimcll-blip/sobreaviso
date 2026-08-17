@@ -1,6 +1,6 @@
 import { Plus, Trash2, UserX } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { SITUACAO_CADASTRAL_LABEL, type ColaboradorDetalhado } from '@shared/types/colaborador';
+import { SITUACAO_CADASTRAL_LABEL, SITUACOES_CADASTRAIS, type ColaboradorDetalhado } from '@shared/types/colaborador';
 import type { ColaboradorImportado } from '@shared/import/colaboradoresDefinicao';
 import { ExportButton } from '../../components/ExportButton';
 import { ImportButton } from '../../components/ImportButton';
@@ -19,6 +19,10 @@ export function CadastroTab() {
   const [colaboradores, setColaboradores] = useState<ColaboradorDetalhado[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState('');
+  const [equipeId, setEquipeId] = useState('');
+  const [ufSigla, setUfSigla] = useState('');
+  const [localidadeId, setLocalidadeId] = useState('');
+  const [situacaoCadastral, setSituacaoCadastral] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [colaboradorEmEdicao, setColaboradorEmEdicao] = useState<ColaboradorDetalhado | null>(null);
   const [selecionados, setSelecionados] = useState<number[]>([]);
@@ -34,20 +38,41 @@ export function CadastroTab() {
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const query = busca ? `?busca=${encodeURIComponent(busca)}` : '';
-      const resposta = await api.get<{ colaboradores: ColaboradorDetalhado[] }>(`/colaboradores${query}`);
+      const params = new URLSearchParams();
+      if (busca) params.set('busca', busca);
+      if (equipeId) params.set('equipeId', equipeId);
+      if (ufSigla) params.set('ufSigla', ufSigla);
+      if (localidadeId) params.set('localidadeId', localidadeId);
+      if (situacaoCadastral) params.set('situacaoCadastral', situacaoCadastral);
+      const resposta = await api.get<{ colaboradores: ColaboradorDetalhado[] }>(`/colaboradores?${params.toString()}`);
       setColaboradores(resposta.colaboradores);
     } catch (erro) {
       notificar(erro instanceof ApiError ? erro.message : 'Não foi possível carregar os colaboradores.', 'erro');
     } finally {
       setCarregando(false);
     }
-  }, [busca, notificar]);
+  }, [busca, equipeId, ufSigla, localidadeId, situacaoCadastral, notificar]);
 
   useEffect(() => {
     const debounce = setTimeout(() => void carregar(), 300);
     return () => clearTimeout(debounce);
   }, [carregar]);
+
+  function aoMudarUf(novaUf: string) {
+    setUfSigla(novaUf);
+    setLocalidadeId('');
+  }
+
+  function limparFiltros() {
+    setBusca('');
+    setEquipeId('');
+    setUfSigla('');
+    setLocalidadeId('');
+    setSituacaoCadastral('');
+  }
+
+  const localidadesDaUf = ufSigla ? referencias.localidades.filter((l) => l.ufSigla === ufSigla) : referencias.localidades;
+  const filtrosAtivos = Boolean(busca || equipeId || ufSigla || localidadeId || situacaoCadastral);
 
   useEffect(() => {
     const idsVisiveis = new Set(colaboradores.map((c) => c.id));
@@ -121,6 +146,43 @@ export function CadastroTab() {
       <div className="card card-padded">
         <div className="table-toolbar">
           <input placeholder="Buscar por nome ou função…" value={busca} onChange={(e) => setBusca(e.target.value)} />
+          <select value={equipeId} onChange={(e) => setEquipeId(e.target.value)}>
+            <option value="">Todas as equipes</option>
+            {referencias.equipes.map((equipe) => (
+              <option key={equipe.id} value={equipe.id}>
+                {equipe.nome}
+              </option>
+            ))}
+          </select>
+          <select value={ufSigla} onChange={(e) => aoMudarUf(e.target.value)}>
+            <option value="">Todas as UFs</option>
+            {referencias.uf.map((item) => (
+              <option key={item.sigla} value={item.sigla}>
+                {item.sigla} — {item.nome}
+              </option>
+            ))}
+          </select>
+          <select value={localidadeId} onChange={(e) => setLocalidadeId(e.target.value)}>
+            <option value="">Todas as localidades</option>
+            {localidadesDaUf.map((localidade) => (
+              <option key={localidade.id} value={localidade.id}>
+                {localidade.nome}
+              </option>
+            ))}
+          </select>
+          <select value={situacaoCadastral} onChange={(e) => setSituacaoCadastral(e.target.value)}>
+            <option value="">Todas as situações</option>
+            {SITUACOES_CADASTRAIS.map((situacao) => (
+              <option key={situacao} value={situacao}>
+                {SITUACAO_CADASTRAL_LABEL[situacao]}
+              </option>
+            ))}
+          </select>
+          {filtrosAtivos && (
+            <button className="link-button" onClick={limparFiltros}>
+              Limpar filtros
+            </button>
+          )}
           <div className="table-toolbar-actions">
             {podeExportar && <ExportButton tipo="colaboradores" />}
             {podeImportar && (

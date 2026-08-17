@@ -10,6 +10,9 @@ export const TIPOS_INCONSISTENCIA = [
   'escala_feriado_sem_configuracao',
   'cadastro_incompleto',
   'dupla_incompleta',
+  'sobreaviso_sobrepoe_turno',
+  'interjornada_insuficiente_sobreaviso',
+  'sobreaviso_durante_afastamento',
 ] as const;
 export type TipoInconsistencia = (typeof TIPOS_INCONSISTENCIA)[number];
 
@@ -25,6 +28,9 @@ export const TIPO_INCONSISTENCIA_LABEL: Record<TipoInconsistencia, string> = {
   escala_feriado_sem_configuracao: 'Escala em feriado sem configuração',
   cadastro_incompleto: 'Cadastro incompleto',
   dupla_incompleta: 'Dupla incompleta',
+  sobreaviso_sobrepoe_turno: 'Sobreaviso sobrepõe turno de trabalho',
+  interjornada_insuficiente_sobreaviso: 'Descanso insuficiente entre sobreaviso e turno',
+  sobreaviso_durante_afastamento: 'Sobreaviso durante afastamento/férias',
 };
 
 export const STATUS_INCONSISTENCIA = ['pendente', 'em_revisao', 'justificada', 'aprovada', 'corrigida', 'ignorada'] as const;

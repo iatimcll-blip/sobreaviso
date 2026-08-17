@@ -130,7 +130,7 @@ export async function buscarPorChaveNatural(
 ): Promise<InconsistenciaDetalhada | null> {
   const row = await queryOne<InconsistenciaRow>(
     db,
-    `${SELECT} WHERE i.tipo = ? AND i.colaborador_id IS ? AND i.equipe_id IS ? AND i.data_referencia = ?`,
+    `${SELECT} WHERE i.tipo = ? AND i.colaborador_id IS NOT DISTINCT FROM ? AND i.equipe_id IS NOT DISTINCT FROM ? AND i.data_referencia = ?`,
     [tipo, colaboradorId, equipeId, dataReferencia],
   );
   return row ? map(row) : null;
