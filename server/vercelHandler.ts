@@ -1,5 +1,5 @@
-import app from '../server/index';
-import { construirEnvRuntime } from '../server/lib/runtimeEnv';
+import app from './index';
+import { construirEnvRuntime } from './lib/runtimeEnv';
 
 const env = construirEnvRuntime();
 

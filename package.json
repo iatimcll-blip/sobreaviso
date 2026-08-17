@@ -8,7 +8,7 @@
     "dev:server": "tsx watch --env-file=.env scripts/dev-server.ts",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "seed:dev": "tsx --env-file=.env scripts/seed-dev.ts",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-api.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.server.json --noEmit"
   },
