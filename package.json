@@ -3,7 +3,39 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build && node scripts/prepare-worker.mjs" },
-  "dependencies": { "@vitejs/plugin-react": "latest", "vite": "latest", "typescript": "latest", "react": "latest", "react-dom": "latest", "lucide-react": "latest", "xlsx": "latest" },
-  "devDependencies": {}
+  "scripts": {
+    "dev": "vite",
+    "dev:worker": "wrangler dev server/index.ts --local --persist-to .wrangler/state",
+    "db:migrate:local": "wrangler d1 migrations apply sobreaviso-db --local",
+    "seed:dev": "node scripts/seed-dev.mjs",
+    "build": "vite build && node scripts/build-worker.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.worker.json --noEmit"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "0.9.0",
+    "@vitejs/plugin-react": "6.0.5",
+    "hono": "4.13.2",
+    "lucide-react": "1.31.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-router-dom": "7.18.2",
+    "typescript": "7.0.2",
+    "vite": "8.2.1",
+    "xlsx": "0.18.5",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260816.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "esbuild": "0.28.2",
+    "vitest": "4.1.10",
+    "wrangler": "4.123.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "esbuild@0.28.1": true,
+    "workerd@1.20260811.1": true
+  }
 }

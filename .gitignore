@@ -1,3 +1,10 @@
 node_modules/
 dist/
 *.tsbuildinfo
+.wrangler/
+.dev.vars
+
+# Conteúdo pré-existente em D:\Sobreaviso, não faz parte do repositório
+/base/
+/site-package-20260817/
+/painel-sobreaviso.tar.gz
