@@ -13,4 +13,4 @@ acesso supabase.txt
 /site-package-20260817/
 /painel-sobreaviso.tar.gz
 
-api/\[...route\].js
+api/\[...route\].cjs

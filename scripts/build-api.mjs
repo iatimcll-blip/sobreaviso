@@ -12,8 +12,11 @@ await build({
   entryPoints: ['server/vercelHandler.ts'],
   bundle: true,
   platform: 'node',
-  format: 'esm',
+  // CommonJS, não ESM: a lib xlsx faz require() dinâmico de módulos nativos do Node (ex.:
+  // "stream") em tempo de execução, o que só funciona com o require nativo do CJS — o shim que o
+  // esbuild gera para bundles ESM não cobre require dinâmico de built-ins.
+  format: 'cjs',
   target: 'node22',
-  outfile: 'api/[...route].js',
+  outfile: 'api/[...route].cjs',
   logLevel: 'info',
 });
