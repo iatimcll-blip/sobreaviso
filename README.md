@@ -3,10 +3,15 @@
 Aplicação web para gestão de jornadas, escalas de trabalho, plantões de sobreaviso e conformidade
 trabalhista (CLT) de equipes técnicas no Brasil.
 
+Em produção: **https://sobreaviso-tan.vercel.app**
+
 ## Stack
 
 - **Frontend**: React 19 + React Router (SPA), Vite, TypeScript.
-- **Backend**: Hono (TypeScript) rodando como função serverless Node na Vercel (`api/[[...route]].ts`).
+- **Backend**: Hono (TypeScript) escrito em `server/vercelHandler.ts`, pré-compilado com esbuild
+  (`scripts/build-api.mjs`) pra `api/index.js` (CommonJS — a Vercel roda em runtime Node, e algumas
+  dependências como `xlsx` fazem `require()` dinâmico de módulos nativos que só funciona em CJS).
+  `vercel.json` redireciona `/api/*` pra essa função via rewrite.
 - **Banco de dados**: Postgres no Supabase.
 - **Arquivos**: Supabase Storage (planilhas importadas, exportações, anexos).
 - **Autenticação**: usuário/senha com sessão em cookie httpOnly (PBKDF2 via Web Crypto).

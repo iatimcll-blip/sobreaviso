@@ -11,12 +11,22 @@ construído em 5 fases (ver `README.md` para o status atual e o plano completo s
 ## Stack e convenções
 
 - Frontend: React 19 + React Router 7 (SPA declarativa, `src/app/router.tsx`), TypeScript estrito.
-- Backend: Hono (`server/index.ts`) hospedado na Vercel (runtime Node, função serverless em
-  `api/[[...route]].ts` — **não** Edge, porque o driver Postgres precisa de socket TCP), banco
-  Postgres no Supabase, arquivos no Supabase Storage. `c.env.DB`/`c.env.BUCKET` continuam com a
-  mesma superfície de sempre (`prepare/bind/all/first/run`, `put/get`) através dos adaptadores em
-  `server/db/postgresAdapter.ts` e `server/lib/supabaseStorageAdapter.ts` — ao mexer numa rota ou
-  query existente, trate `db`/`bucket` exatamente como antes, sem se preocupar com o backend real.
+- Backend: Hono (`server/index.ts`) hospedado na Vercel — runtime Node, **não** Edge (o driver
+  Postgres precisa de socket TCP). `server/vercelHandler.ts` é o entrypoint real; `scripts/build-api.mjs`
+  (esbuild) pré-compila ele pra `api/index.js` (CommonJS, ver nota abaixo) antes do deploy —
+  **nunca edite `api/index.js` direto, é gerado**. `vercel.json` tem um rewrite mapeando
+  `/api/*` pra essa função (nome de arquivo com colchetes tipo `[...route]` é convenção do
+  Next.js, não funciona em projetos "outro framework"). Banco Postgres no Supabase, arquivos no
+  Supabase Storage. `c.env.DB`/`c.env.BUCKET` continuam com a mesma superfície de sempre
+  (`prepare/bind/all/first/run`, `put/get`) através dos adaptadores em `server/db/postgresAdapter.ts`
+  e `server/lib/supabaseStorageAdapter.ts` — ao mexer numa rota ou query existente, trate
+  `db`/`bucket` exatamente como antes, sem se preocupar com o backend real.
+- O bundle da API é CommonJS de propósito: a lib `xlsx` faz `require()` dinâmico de módulos nativos
+  do Node em runtime, o que não funciona no shim de `require` que o esbuild gera pra bundles ESM.
+  `api/package.json` (`{"type":"commonjs"}`) força isso mesmo com o resto do projeto sendo ESM.
+  Além disso, o build da Vercel **não roda bem com `typescript@7.0.2`** (a reescrita nativa/Go) pra
+  analisar arquivos `.ts` dentro de `/api` — por isso o pré-build gera JS puro, e a Vercel nunca
+  precisa tocar em TypeScript ali.
 - Todas as dependências são versões fixas (sem `^`/`latest`) — ao adicionar uma nova, fixe a versão
   exata resolvida.
 - `shared/` não pode importar nada de `server/` ou `src/` — é código puro, sem I/O, usado dos dois
