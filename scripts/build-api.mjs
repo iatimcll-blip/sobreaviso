@@ -17,6 +17,9 @@ await build({
   // esbuild gera para bundles ESM não cobre require dinâmico de built-ins.
   format: 'cjs',
   target: 'node22',
-  outfile: 'api/[...route].cjs',
+  // api/package.json força "type":"commonjs" pra esse diretório, então ".js" aqui já roda como
+  // CJS mesmo com o resto do projeto sendo ESM — e ".js" é a extensão que a Vercel reconhece pra
+  // rotas de função ("[...route].cjs" não é detectado pelo file-based routing deles).
+  outfile: 'api/[...route].js',
   logLevel: 'info',
 });
