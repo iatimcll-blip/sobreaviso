@@ -153,5 +153,5 @@ export async function adicionarMembro(db: D1Database, equipeId: number, dado: Eq
 }
 
 export async function encerrarMembro(db: D1Database, membroId: number): Promise<void> {
-  await execute(db, `UPDATE equipe_membros SET data_fim = date('now') WHERE id = ?`, [membroId]);
+  await execute(db, `UPDATE equipe_membros SET data_fim = to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD') WHERE id = ?`, [membroId]);
 }

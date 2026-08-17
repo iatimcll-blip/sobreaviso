@@ -22,7 +22,7 @@ CREATE TABLE configuracoes_clt (
 INSERT INTO configuracoes_clt (id) VALUES (1);
 
 CREATE TABLE ciclos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   rotulo TEXT NOT NULL UNIQUE,
   data_inicio TEXT NOT NULL,
   data_fim TEXT NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE ciclos (
 );
 
 CREATE TABLE inconsistencias (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   tipo TEXT NOT NULL,
   colaborador_id INTEGER REFERENCES colaboradores(id),
   equipe_id INTEGER REFERENCES equipes(id),

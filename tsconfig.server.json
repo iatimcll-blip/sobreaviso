@@ -2,8 +2,8 @@
   "compilerOptions": {
     "composite": true,
     "target": "ES2022",
-    "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types"],
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -18,5 +18,5 @@
       "@shared/*": ["./shared/*"]
     }
   },
-  "include": ["server", "shared"]
+  "include": ["server", "shared", "api", "scripts"]
 }

@@ -3,6 +3,10 @@ dist/
 *.tsbuildinfo
 .wrangler/
 .dev.vars
+.env
+.env.local
+.vercel
+acesso supabase.txt
 
 # Conteúdo pré-existente em D:\Sobreaviso, não faz parte do repositório
 /base/

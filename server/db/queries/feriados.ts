@@ -93,10 +93,10 @@ export async function criarFeriado(db: D1Database, dado: FeriadoEntrada, origem:
 
   // Checagem explícita em vez de depender só da constraint UNIQUE: no SQL, NULL nunca é igual a NULL,
   // então "uf_sigla = ?"/"localidade_id = ?" nunca bloqueariam duas linhas nacionais (ambas com NULL).
-  // O operador "IS" faz a comparação NULL-safe.
+  // "IS NOT DISTINCT FROM" faz a comparação NULL-safe (equivalente Postgres do "IS" do SQLite).
   const existente = await queryOne<{ id: number }>(
     db,
-    `SELECT id FROM feriados WHERE data = ? AND nome = ? AND abrangencia = ? AND uf_sigla IS ? AND localidade_id IS ?`,
+    `SELECT id FROM feriados WHERE data = ? AND nome = ? AND abrangencia = ? AND uf_sigla IS NOT DISTINCT FROM ? AND localidade_id IS NOT DISTINCT FROM ?`,
     [dado.data, dado.nome, dado.abrangencia, ufSigla, localidadeId],
   );
   if (existente) return null;

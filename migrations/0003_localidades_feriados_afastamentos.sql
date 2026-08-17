@@ -1,7 +1,7 @@
 -- Fase 3: feriados (nacionais/estaduais/municipais) e afastamentos/ocorrências
 
 CREATE TABLE feriados (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   data TEXT NOT NULL,
   ano INTEGER NOT NULL,
   nome TEXT NOT NULL,
@@ -18,7 +18,7 @@ CREATE INDEX idx_feriados_uf ON feriados(uf_sigla);
 CREATE INDEX idx_feriados_localidade ON feriados(localidade_id);
 
 CREATE TABLE afastamentos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
   tipo TEXT NOT NULL CHECK (tipo IN ('ferias', 'banco_horas', 'atestado', 'falta', 'medida_disciplinar', 'licenca', 'folga_compensatoria', 'outros')),
   data_inicio TEXT NOT NULL,

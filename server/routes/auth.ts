@@ -29,7 +29,7 @@ authRoutes.post('/login', validar('json', loginSchema), async (c) => {
     tokenHash,
     expiraEm: calcularExpiracaoSessao(),
     userAgent: c.req.header('user-agent') ?? null,
-    ip: c.req.header('cf-connecting-ip') ?? null,
+    ip: c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? c.req.header('x-real-ip') ?? null,
   });
   await registrarUltimoLogin(c.env.DB, usuario.id);
   await registrarAuditoria(c.env.DB, { entidade: 'usuario', entidadeId: usuario.id, acao: 'login', usuarioId: usuario.id });

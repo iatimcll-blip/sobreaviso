@@ -37,9 +37,6 @@ app.route('/api/calculos', calculosRoutes);
 app.route('/api/inconsistencias', inconsistenciasRoutes);
 app.route('/api/exportacoes', exportacoesRoutes);
 
-app.notFound((c) => {
-  if (c.req.path.startsWith('/api/')) return c.json({ erro: 'Rota não encontrada.' }, 404);
-  return c.env.ASSETS.fetch(c.req.raw);
-});
+app.notFound((c) => c.json({ erro: 'Rota não encontrada.' }, 404));
 
 export default app;

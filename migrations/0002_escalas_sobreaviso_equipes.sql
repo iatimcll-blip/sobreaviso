@@ -1,9 +1,9 @@
 -- Fase 2: escalas, sobreaviso (com rodízio), equipes (membros) e duplas
-
-ALTER TABLE colaboradores ADD COLUMN tipo_escala_padrao_id INTEGER REFERENCES escalas_modelo(id);
+-- Versão Postgres: escalas_modelo precisa existir antes do ALTER TABLE colaboradores (Postgres
+-- valida a FK no momento da alteração; na versão SQLite original a ordem era invertida).
 
 CREATE TABLE escalas_modelo (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   nome TEXT NOT NULL,
   tipo TEXT NOT NULL CHECK (tipo IN ('5x2', '6x1', '12x36', '4x2', 'personalizada')),
   turno TEXT NOT NULL DEFAULT 'diurno' CHECK (turno IN ('diurno', 'noturno', 'misto')),
@@ -19,8 +19,10 @@ CREATE TABLE escalas_modelo (
   criado_por INTEGER REFERENCES users(id)
 );
 
+ALTER TABLE colaboradores ADD COLUMN tipo_escala_padrao_id INTEGER REFERENCES escalas_modelo(id);
+
 CREATE TABLE escalas_turno (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   escala_modelo_id INTEGER NOT NULL REFERENCES escalas_modelo(id),
   ciclo_dia INTEGER NOT NULL,
   hora_entrada TEXT,
@@ -33,7 +35,7 @@ CREATE TABLE escalas_turno (
 CREATE INDEX idx_escalas_turno_modelo ON escalas_turno(escala_modelo_id);
 
 CREATE TABLE escala_vinculos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   escala_modelo_id INTEGER NOT NULL REFERENCES escalas_modelo(id),
   colaborador_id INTEGER REFERENCES colaboradores(id),
   equipe_id INTEGER REFERENCES equipes(id),
@@ -48,31 +50,31 @@ CREATE INDEX idx_escala_vinculos_colaborador ON escala_vinculos(colaborador_id);
 CREATE INDEX idx_escala_vinculos_equipe ON escala_vinculos(equipe_id);
 
 CREATE TABLE equipe_membros (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   equipe_id INTEGER NOT NULL REFERENCES equipes(id),
   colaborador_id INTEGER NOT NULL REFERENCES colaboradores(id),
   papel TEXT NOT NULL DEFAULT 'tecnico' CHECK (papel IN ('tecnico', 'supervisor', 'ga', 'go')),
-  data_inicio TEXT NOT NULL DEFAULT (date('now')),
+  data_inicio TEXT NOT NULL DEFAULT (to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD')),
   data_fim TEXT
 );
 CREATE INDEX idx_equipe_membros_equipe ON equipe_membros(equipe_id);
 CREATE INDEX idx_equipe_membros_colaborador ON equipe_membros(colaborador_id);
 
 CREATE TABLE duplas (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   equipe_id INTEGER REFERENCES equipes(id),
   nome TEXT,
   colaborador_1_id INTEGER NOT NULL REFERENCES colaboradores(id),
   colaborador_2_id INTEGER REFERENCES colaboradores(id),
   ativo INTEGER NOT NULL DEFAULT 1,
-  data_inicio TEXT NOT NULL DEFAULT (date('now')),
+  data_inicio TEXT NOT NULL DEFAULT (to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD')),
   data_fim TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_duplas_equipe ON duplas(equipe_id);
 
 CREATE TABLE sobreaviso_regras (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   nome TEXT NOT NULL,
   periodicidade_dias INTEGER NOT NULL DEFAULT 7,
   hora_troca TEXT NOT NULL DEFAULT '07:00',
@@ -83,7 +85,7 @@ CREATE TABLE sobreaviso_regras (
 );
 
 CREATE TABLE sobreaviso_regra_equipes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   regra_id INTEGER NOT NULL REFERENCES sobreaviso_regras(id),
   equipe_id INTEGER NOT NULL REFERENCES equipes(id),
   ordem INTEGER NOT NULL,
@@ -92,7 +94,7 @@ CREATE TABLE sobreaviso_regra_equipes (
 CREATE INDEX idx_sobreaviso_regra_equipes_regra ON sobreaviso_regra_equipes(regra_id);
 
 CREATE TABLE sobreavisos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   colaborador_id INTEGER REFERENCES colaboradores(id),
   equipe_id INTEGER REFERENCES equipes(id),
   dupla_id INTEGER REFERENCES duplas(id),

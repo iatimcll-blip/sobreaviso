@@ -1,7 +1,7 @@
 -- Fase 5: histórico de exportações
 
 CREATE TABLE export_historico (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   tipo TEXT NOT NULL,
   filtros_json TEXT,
   ciclo_referencia TEXT,
