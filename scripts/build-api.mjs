@@ -14,6 +14,6 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node22',
-  outfile: 'api/[[...route]].js',
+  outfile: 'api/[...route].js',
   logLevel: 'info',
 });
