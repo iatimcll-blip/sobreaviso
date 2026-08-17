@@ -1,6 +1,8 @@
-import { CalendarDays, X } from 'lucide-react';
+import { CalendarDays, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { CONFIGURACOES_CLT_PADRAO, type ConfiguracoesClt } from '@shared/constants/clt';
 import { gerarTurnosPadrao } from '@shared/constants/escalaPresets';
+import { gerarTurnosAutomaticos } from '@shared/calculo/geradorEscala';
 import { TIPOS_ESCALA, TIPO_ESCALA_LABEL, TURNOS_ESCALA, type EscalaModeloDetalhado, type EscalaModeloEntrada, type EscalaVinculo, type TipoEscala, type TurnoEscala } from '@shared/types/escala';
 import type { Equipe } from '@shared/types/equipe';
 import type { Localidade } from '@shared/types/localidade';
@@ -44,6 +46,18 @@ export function EscalaFormModal({ escalaId, colaboradores, equipes, localidades,
   const [salvando, setSalvando] = useState(false);
   const [carregando, setCarregando] = useState(Boolean(escalaId));
 
+  const [configClt, setConfigClt] = useState<ConfiguracoesClt>(CONFIGURACOES_CLT_PADRAO);
+  const [horaEntradaGerador, setHoraEntradaGerador] = useState('08:00');
+  const [duracaoGerador, setDuracaoGerador] = useState(8);
+  const [erroGerador, setErroGerador] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get<{ configuracoes: ConfiguracoesClt }>('/calculos/configuracoes-clt')
+      .then((resposta) => setConfigClt(resposta.configuracoes))
+      .catch(() => setConfigClt(CONFIGURACOES_CLT_PADRAO));
+  }, []);
+
   useEffect(() => {
     if (!escalaId) {
       setForm(formVazio());
@@ -73,6 +87,30 @@ export function EscalaFormModal({ escalaId, colaboradores, equipes, localidades,
 
   function aoMudarTipo(tipo: TipoEscala) {
     setForm({ ...form, tipo, turnos: gerarTurnosPadrao(tipo) });
+    setErroGerador(null);
+    if (tipo === '12x36') {
+      setHoraEntradaGerador('07:00');
+      setDuracaoGerador(12);
+    } else if (duracaoGerador === 12) {
+      setDuracaoGerador(8);
+    }
+  }
+
+  function aoGerarAutomaticamente() {
+    setErroGerador(null);
+    try {
+      const resultado = gerarTurnosAutomaticos({
+        tipo: form.tipo,
+        horaEntrada: horaEntradaGerador,
+        duracaoJornadaHoras: duracaoGerador,
+        possuiAcordoColetivo: form.possuiAcordoColetivo ?? false,
+        config: configClt,
+      });
+      setForm({ ...form, turnos: resultado.turnos, turno: resultado.turnoSugerido, duracaoIntervaloMinutos: resultado.intervaloMinutos });
+      notificar(`Turnos gerados — saída às ${resultado.horaSaida}, intervalo de ${resultado.intervaloMinutos}min.`, 'sucesso');
+    } catch (erroCapturado) {
+      setErroGerador(erroCapturado instanceof Error ? erroCapturado.message : 'Não foi possível gerar os turnos.');
+    }
   }
 
   async function aoSubmeter() {
@@ -183,6 +221,48 @@ export function EscalaFormModal({ escalaId, colaboradores, equipes, localidades,
               Observações
               <input value={form.observacoes ?? ''} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
             </label>
+
+            {form.tipo === 'personalizada' ? (
+              <p className="mt-10">
+                <small>
+                  Geração automática não está disponível para escalas personalizadas — cada dia pode ter um horário diferente. Configure os
+                  turnos manualmente abaixo.
+                </small>
+              </p>
+            ) : (
+              <fieldset className="fieldset-plano">
+                <h2>Gerador automático de turnos</h2>
+                <p>
+                  <small>
+                    Informe entrada e duração da jornada — a saída, o intervalo e a distribuição de folgas são calculados automaticamente
+                    respeitando os limites CLT configurados (interjornada, intervalo intrajornada e jornada máxima).
+                  </small>
+                </p>
+                <div className="field-grid-2">
+                  <label className="field">
+                    Horário de entrada
+                    <input type="time" value={horaEntradaGerador} onChange={(e) => setHoraEntradaGerador(e.target.value)} />
+                  </label>
+                  <label className="field">
+                    Duração da jornada (horas)
+                    <input
+                      type="number"
+                      min={0.5}
+                      max={24}
+                      step={0.5}
+                      value={duracaoGerador}
+                      disabled={form.tipo === '12x36'}
+                      onChange={(e) => setDuracaoGerador(Number(e.target.value))}
+                    />
+                  </label>
+                </div>
+                {erroGerador && <div className="auth-error">{erroGerador}</div>}
+                <button type="button" className="outline mt-10" onClick={aoGerarAutomaticamente}>
+                  <Sparkles size={16} />
+                  Gerar turnos automaticamente
+                </button>
+              </fieldset>
+            )}
 
             <EscalaTurnosEditor tipo={form.tipo} turnos={form.turnos} onChange={(turnos) => setForm({ ...form, turnos })} />
 

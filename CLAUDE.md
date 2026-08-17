@@ -114,6 +114,14 @@ genérica de erro, escondendo qual campo era inválido. O wrapper `validar` já 
   funções puras, uma por regra, orquestradas por `executarRegrasColaborador` (por colaborador) e
   `detectarDuplaIncompleta` (por dupla, não é escopado por colaborador). O único lugar que toca o
   banco é `server/services/calculo/executarCalculoCiclo.ts`.
+- `shared/calculo/geradorEscala.ts::gerarTurnosAutomaticos` gera os turnos de um modelo 5x2/6x1/12x36/4x2
+  a partir de horário de entrada + duração da jornada, reaplicando os **mesmos** limiares de
+  `shared/calculo/inconsistencias/jornada.ts` (interjornada, intrajornada graduado, jornada máxima,
+  12h fixas do 12x36) — não duplique o número mágico, importe/replique a mesma lógica de limite pra
+  não gerar um padrão que o motor de detecção vá acusar em seguida. Não cobre `personalizada` (cada
+  dia pode ter horário diferente) nem feriados/afastamentos — isso é responsabilidade do vínculo
+  colaborador↔escala numa data real, já coberta por `afastamentosFeriados.ts`, não do modelo cíclico
+  em si (`cicloDia`, sem data absoluta).
 - Persistência é upsert por chave natural (`tipo`, `colaboradorId`, `equipeId`, `dataReferencia`):
   o que já foi revisado por um humano (`STATUS_REVISADOS`) nunca é sobrescrito; o que não foi
   redetectado numa nova execução vira `corrigida` automaticamente. Ao adicionar uma regra nova, não
