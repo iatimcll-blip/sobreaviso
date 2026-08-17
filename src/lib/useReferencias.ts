@@ -7,6 +7,7 @@ import { api } from './api-client';
 export interface ColaboradorResumo {
   id: number;
   nome: string;
+  funcao: string;
   situacaoCadastral: string;
 }
 

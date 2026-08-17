@@ -111,16 +111,17 @@ export async function buscarColaboradorPorNome(db: D1Database, nome: string): Pr
 export interface ColaboradorResumo {
   id: number;
   nome: string;
+  funcao: string;
   situacaoCadastral: ColaboradorDetalhado['situacaoCadastral'];
 }
 
-/** Lista enxuta (id/nome/situação) para preencher seletores em outras telas, sem exigir a permissão de "colaboradores". */
+/** Lista enxuta (id/nome/função/situação) para preencher seletores em outras telas, sem exigir a permissão de "colaboradores". */
 export async function listarColaboradoresResumo(db: D1Database): Promise<ColaboradorResumo[]> {
-  const rows = await query<{ id: number; nome: string; situacao_cadastral: ColaboradorDetalhado['situacaoCadastral'] }>(
+  const rows = await query<{ id: number; nome: string; funcao: string; situacao_cadastral: ColaboradorDetalhado['situacaoCadastral'] }>(
     db,
-    "SELECT id, nome, situacao_cadastral FROM colaboradores WHERE situacao_cadastral != 'desligado' ORDER BY nome ASC",
+    "SELECT id, nome, funcao, situacao_cadastral FROM colaboradores WHERE situacao_cadastral != 'desligado' ORDER BY nome ASC",
   );
-  return rows.map((row) => ({ id: row.id, nome: row.nome, situacaoCadastral: row.situacao_cadastral }));
+  return rows.map((row) => ({ id: row.id, nome: row.nome, funcao: row.funcao, situacaoCadastral: row.situacao_cadastral }));
 }
 
 export async function criarColaborador(db: D1Database, dado: ColaboradorEntrada, usuarioId: number | null): Promise<number> {

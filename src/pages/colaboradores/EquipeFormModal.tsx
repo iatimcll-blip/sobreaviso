@@ -1,7 +1,15 @@
 import { Trash2, Users, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { UfInfo } from '@shared/constants/ufs';
-import { PAPEIS_EQUIPE_MEMBRO, PAPEL_EQUIPE_MEMBRO_LABEL, type EquipeDetalhada, type EquipeEntrada, type EquipeMembro, type PapelEquipeMembro } from '@shared/types/equipe';
+import {
+  PAPEIS_EQUIPE_MEMBRO,
+  PAPEL_EQUIPE_MEMBRO_LABEL,
+  sugerirPapelPorFuncao,
+  type EquipeDetalhada,
+  type EquipeEntrada,
+  type EquipeMembro,
+  type PapelEquipeMembro,
+} from '@shared/types/equipe';
 import type { Localidade } from '@shared/types/localidade';
 import { ApiError, api } from '../../lib/api-client';
 import type { ColaboradorResumo } from '../../lib/useReferencias';
@@ -68,6 +76,15 @@ export function EquipeFormModal({ equipe, localidades, colaboradores, aoFechar, 
     }
   }
 
+  function selecionarNovoMembro(colaboradorId: string) {
+    setNovoMembroId(colaboradorId);
+    const colaborador = colaboradores.find((c) => String(c.id) === colaboradorId);
+    if (colaborador) {
+      const sugestao = sugerirPapelPorFuncao(colaborador.funcao);
+      if (sugestao) setNovoMembroPapel(sugestao);
+    }
+  }
+
   async function adicionarMembro() {
     if (!equipe || !novoMembroId) return;
     try {
@@ -95,6 +112,7 @@ export function EquipeFormModal({ equipe, localidades, colaboradores, aoFechar, 
 
   const membrosIds = new Set(membros.map((m) => m.colaboradorId));
   const candidatos = colaboradores.filter((c) => !membrosIds.has(c.id));
+  const funcaoPorColaboradorId = new Map(colaboradores.map((c) => [c.id, c.funcao]));
 
   return (
     <div className="overlay">
@@ -179,12 +197,14 @@ export function EquipeFormModal({ equipe, localidades, colaboradores, aoFechar, 
         {equipe && (
           <div className="field">
             Membros da equipe
+            <p className="field-hint">Ligue Técnicos, Oficiais e Auxiliares (ou outros papéis de gestão) a esta equipe.</p>
             <div className="data-table-wrap">
               <table className="data-table">
                 <thead>
                   <tr>
                     <th>Colaborador</th>
-                    <th>Papel</th>
+                    <th>Função cadastrada</th>
+                    <th>Papel na equipe</th>
                     <th className="col-acoes">Ações</th>
                   </tr>
                 </thead>
@@ -192,6 +212,7 @@ export function EquipeFormModal({ equipe, localidades, colaboradores, aoFechar, 
                   {membros.map((membro) => (
                     <tr key={membro.id}>
                       <td>{membro.colaboradorNome}</td>
+                      <td>{funcaoPorColaboradorId.get(membro.colaboradorId) ?? '—'}</td>
                       <td>{PAPEL_EQUIPE_MEMBRO_LABEL[membro.papel]}</td>
                       <td className="col-acoes">
                         <button onClick={() => void removerMembro(membro.id)} title="Remover da equipe">
@@ -202,7 +223,7 @@ export function EquipeFormModal({ equipe, localidades, colaboradores, aoFechar, 
                   ))}
                   {membros.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="data-table-empty">
+                      <td colSpan={4} className="data-table-empty">
                         Nenhum membro na equipe ainda.
                       </td>
                     </tr>
@@ -211,11 +232,11 @@ export function EquipeFormModal({ equipe, localidades, colaboradores, aoFechar, 
               </table>
             </div>
             <div className="table-toolbar mt-10">
-              <select value={novoMembroId} onChange={(e) => setNovoMembroId(e.target.value)}>
+              <select value={novoMembroId} onChange={(e) => selecionarNovoMembro(e.target.value)}>
                 <option value="">Selecione um colaborador…</option>
                 {candidatos.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.nome}
+                    {c.nome} — {c.funcao}
                   </option>
                 ))}
               </select>

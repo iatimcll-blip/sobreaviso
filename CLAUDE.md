@@ -76,6 +76,21 @@ Uma `sobreaviso_regra` (rodízio automático entre equipes) pode opcionalmente d
 participa do cálculo de rodízio em si (`shared/calculo/rodizio.ts::calcularRodizio` continua
 girando só entre as equipes na ordem definida); não acople a lógica de rotação a `localidadeIds`.
 
+## Equipes e membros
+
+`colaboradores.equipe_id` (uma equipe por colaborador) e `equipe_membros` (join table com `papel`,
+`server/db/queries/equipes.ts::listarMembrosAtivos`/`adicionarMembro`/`encerrarMembro`) são dois
+mecanismos independentes — a UI de "Membros da equipe" em `EquipeFormModal.tsx` só mexe no segundo,
+nunca no `equipe_id` do colaborador. `PAPEIS_EQUIPE_MEMBRO` (`shared/types/equipe.ts`) é a lista
+única de papéis (`tecnico`/`oficial`/`auxiliar`/`supervisor`/`ga`/`go`, espelhada no CHECK de
+`equipe_membros.papel`) — ao adicionar um papel novo, atualize essa constante (dirige o `<select>`
+e o rótulo) e crie uma migration alterando o CHECK constraint (nome padrão do Postgres pra CHECK de
+coluna única é `<tabela>_<coluna>_check`, ex.: `equipe_membros_papel_check`; use
+`pg_get_constraintdef` pra confirmar o nome antes de dropar, não assuma). `sugerirPapelPorFuncao`
+(mesmo arquivo) só dá um palpite de papel a partir do texto livre de `colaboradores.funcao` pra
+pré-selecionar o `<select>` — nunca é a fonte de verdade, o usuário sempre pode trocar antes de
+adicionar o membro.
+
 ## Importação de planilhas
 
 O motor é genérico e reaproveitável: `shared/import/contract.ts` define `ImportadorDefinicao<T>`,

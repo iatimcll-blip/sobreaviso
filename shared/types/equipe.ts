@@ -25,15 +25,26 @@ export interface EquipeEntrada {
   ativo?: boolean;
 }
 
-export const PAPEIS_EQUIPE_MEMBRO = ['tecnico', 'supervisor', 'ga', 'go'] as const;
+export const PAPEIS_EQUIPE_MEMBRO = ['tecnico', 'oficial', 'auxiliar', 'supervisor', 'ga', 'go'] as const;
 export type PapelEquipeMembro = (typeof PAPEIS_EQUIPE_MEMBRO)[number];
 
 export const PAPEL_EQUIPE_MEMBRO_LABEL: Record<PapelEquipeMembro, string> = {
   tecnico: 'Técnico',
+  oficial: 'Oficial',
+  auxiliar: 'Auxiliar',
   supervisor: 'Supervisor',
   ga: 'Gestor Administrativo',
   go: 'Gestor Operacional',
 };
+
+/** Sugere o papel de equipe mais provável a partir do texto livre de `colaboradores.funcao`. */
+export function sugerirPapelPorFuncao(funcao: string): PapelEquipeMembro | null {
+  const texto = funcao.toLocaleLowerCase('pt-BR');
+  if (texto.includes('auxiliar')) return 'auxiliar';
+  if (texto.includes('oficial')) return 'oficial';
+  if (texto.includes('técnico') || texto.includes('tecnico')) return 'tecnico';
+  return null;
+}
 
 export interface EquipeMembro {
   id: number;
