@@ -22,7 +22,7 @@ function ehInsertSemReturning(sqlText: string): boolean {
   return /^\s*insert\s/i.test(sqlText) && !/\breturning\b/i.test(sqlText);
 }
 
-const TIMEOUT_QUERY_MS = 8000;
+const TIMEOUT_QUERY_MS = 5000;
 
 class QueryTimeoutError extends Error {
   constructor(sqlText: string) {
@@ -37,7 +37,10 @@ let clienteAtual: postgres.Sql | undefined;
 function criarCliente(connectionString: string): postgres.Sql {
   return postgres(connectionString, {
     ssl: 'require',
-    max: 3,
+    // O dashboard sozinho já dispara ~8 chamadas em paralelo no carregamento (sidebar + anel de
+    // cobertura somam mais algumas) — um pool de poucas conexões vira gargalo/contenção real e
+    // aumenta a chance de bater no cenário de conexão travada tratado em comTimeout().
+    max: 10,
     idle_timeout: 20,
     // Recicla conexões com frequência: o pooler "Transaction" do Supabase às vezes derruba uma
     // conexão do lado dele sem avisar o cliente, e o postgres.js só percebe na próxima tentativa

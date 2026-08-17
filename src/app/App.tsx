@@ -13,6 +13,7 @@ export function AppShell() {
         <main>
           <Outlet />
         </main>
+        <footer className="app-footer marca-footer">Jarvis MCLL · alloha FIBRA</footer>
       </div>
     </MenuContext.Provider>
   );

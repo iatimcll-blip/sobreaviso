@@ -17,6 +17,7 @@ import { useAuth } from '../../lib/auth-context';
 import { temPermissao } from '../../lib/permissions';
 import { Metric } from '../../components/Metric';
 import { ExportButton } from '../../components/ExportButton';
+import { AnelCobertura24h } from '../../components/AnelCobertura24h';
 
 const HOJE_ISO = new Date().toISOString().slice(0, 10);
 
@@ -55,7 +56,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     Promise.all([
-      api.get<{ colaboradores: ColaboradorDetalhado[] }>('/colaboradores'),
+      api.get<{ colaboradores: ColaboradorDetalhado[] }>('/colaboradores').catch(() => ({ colaboradores: [] })),
       api.get<{ status: StatusRodizio[] }>('/sobreaviso/status-rodizio').catch(() => ({ status: [] })),
       api.get<{ sobreavisos: SobreavisoDetalhado[] }>('/sobreaviso').catch(() => ({ sobreavisos: [] })),
       api.get<{ feriados: FeriadoDetalhado[] }>(`/feriados?ano=${new Date().getFullYear()}&abrangencia=nacional`).catch(() => ({ feriados: [] })),
@@ -82,6 +83,7 @@ export function DashboardPage() {
     .filter((a) => a.status !== 'rejeitado' && a.dataFim >= HOJE_ISO)
     .slice(0, 3);
 
+  const primeiroAtivo = colaboradores.find((c) => c.situacaoCadastral === 'ativo') ?? null;
   const ativos = colaboradores.filter((c) => c.situacaoCadastral === 'ativo').length;
   const afastados = colaboradores.filter((c) => c.situacaoCadastral === 'afastado').length;
 
@@ -119,7 +121,11 @@ export function DashboardPage() {
         />
       </section>
 
-      <section className="content-grid">
+      {!carregando && primeiroAtivo && (
+        <AnelCobertura24h localidadeId={primeiroAtivo.localidadeId} localidadeNome={primeiroAtivo.localidadeNome} />
+      )}
+
+      <section className="content-grid" style={{ marginTop: primeiroAtivo ? 20 : 0 }}>
         <div className="card schedule">
           <div className="card-head">
             <div>
