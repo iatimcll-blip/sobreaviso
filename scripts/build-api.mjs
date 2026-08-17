@@ -18,8 +18,9 @@ await build({
   format: 'cjs',
   target: 'node22',
   // api/package.json força "type":"commonjs" pra esse diretório, então ".js" aqui já roda como
-  // CJS mesmo com o resto do projeto sendo ESM — e ".js" é a extensão que a Vercel reconhece pra
-  // rotas de função ("[...route].cjs" não é detectado pelo file-based routing deles).
-  outfile: 'api/[...route].js',
+  // CJS mesmo com o resto do projeto sendo ESM. Nome fixo (sem colchetes): roteamento dinâmico por
+  // nome de arquivo ("[...param]") é convenção do Next.js, não um recurso genérico de Vercel
+  // Functions para projetos "outro framework" — o vercel.json redireciona /api/* pra cá via rewrite.
+  outfile: 'api/index.js',
   logLevel: 'info',
 });
