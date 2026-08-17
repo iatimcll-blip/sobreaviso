@@ -84,6 +84,27 @@ export async function listarSobreavisos(db: D1Database, filtro: FiltroSobreaviso
   return rows.map(map);
 }
 
+/**
+ * Sobreavisos que se aplicam a um colaborador — lançados diretamente nele OU na equipe dele
+ * (ex.: turno de rodízio automático gerado por equipe). Usado pelo motor de inconsistências, que
+ * precisa enxergar os dois casos ao checar CLT contra a escala real do colaborador.
+ */
+export async function listarSobreavisosDoColaborador(
+  db: D1Database,
+  colaboradorId: number,
+  equipeId: number | null,
+  de: string,
+  ate: string,
+): Promise<SobreavisoDetalhado[]> {
+  const rows = await query<SobreavisoRow>(
+    db,
+    `${SELECT} WHERE s.status != 'cancelado' AND s.fim >= ? AND s.inicio <= ? AND (s.colaborador_id = ? OR s.equipe_id = ?)
+     ORDER BY s.inicio ASC`,
+    [de, ate, colaboradorId, equipeId],
+  );
+  return rows.map(map);
+}
+
 export interface ConflitoSobreaviso {
   id: number;
   inicio: string;
@@ -145,6 +166,33 @@ export async function criarSobreaviso(db: D1Database, dado: SobreavisoEntrada, u
     ],
   );
   return Number(resultado.meta.last_row_id);
+}
+
+export interface SobreavisoRodizioEntrada {
+  equipeId: number;
+  regraId: number;
+  inicio: string;
+  fim: string;
+}
+
+/** Materializa um turno do rodízio automático como um lançamento real de sobreaviso (origem = 'rodizio_automatico'). */
+export async function criarSobreavisoRodizio(db: D1Database, dado: SobreavisoRodizioEntrada, usuarioId: number | null): Promise<number> {
+  const resultado = await execute(
+    db,
+    `INSERT INTO sobreavisos (equipe_id, inicio, fim, origem, regra_id, criado_por) VALUES (?, ?, ?, 'rodizio_automatico', ?, ?)`,
+    [dado.equipeId, dado.inicio, dado.fim, dado.regraId, usuarioId],
+  );
+  return Number(resultado.meta.last_row_id);
+}
+
+/** Remove os lançamentos gerados automaticamente por uma regra num período — para regenerar de forma idempotente. */
+export async function excluirSobreavisosGeradosDaRegra(db: D1Database, regraId: number, de: string, ate: string): Promise<number> {
+  const resultado = await execute(
+    db,
+    `DELETE FROM sobreavisos WHERE regra_id = ? AND origem = 'rodizio_automatico' AND inicio >= ? AND inicio <= ? RETURNING id`,
+    [regraId, de, ate],
+  );
+  return resultado.results.length;
 }
 
 export async function cancelarSobreaviso(db: D1Database, id: number): Promise<void> {

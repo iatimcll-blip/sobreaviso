@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcularRodizio, type RegraRodizio } from './rodizio';
+import { calcularRodizio, gerarTurnosRodizio, type RegraRodizio } from './rodizio';
 
 const regraDuasEquipes: RegraRodizio = {
   dataInicio: '2026-01-01',
@@ -61,5 +61,29 @@ describe('calcularRodizio', () => {
 
   it('retorna null quando não há equipes configuradas', () => {
     expect(calcularRodizio({ ...regraDuasEquipes, equipes: [] })).toBeNull();
+  });
+});
+
+describe('gerarTurnosRodizio', () => {
+  it('enumera os turnos sucessivos dentro do período, alternando as equipes', () => {
+    const turnos = gerarTurnosRodizio(regraDuasEquipes, '2026-01-01', '2026-01-21');
+    expect(turnos.map((t) => t.equipeAtual.equipeNome)).toEqual(['Equipe Norte', 'Equipe Sul', 'Equipe Norte']);
+    expect(turnos[0].inicioTurnoAtual).toBe('2026-01-01T07:00:00.000Z');
+    expect(turnos[0].fimTurnoAtual).toBe(turnos[1].inicioTurnoAtual);
+  });
+
+  it('gera só o turno vigente quando o período é menor que a periodicidade', () => {
+    const turnos = gerarTurnosRodizio(regraDuasEquipes, '2026-01-02', '2026-01-05');
+    expect(turnos).toHaveLength(1);
+    expect(turnos[0].equipeAtual.equipeNome).toBe('Equipe Norte');
+  });
+
+  it('período antes do início do rodízio começa no primeiro turno real', () => {
+    const turnos = gerarTurnosRodizio(regraDuasEquipes, '2025-12-01', '2026-01-10');
+    expect(turnos[0].inicioTurnoAtual).toBe('2026-01-01T07:00:00.000Z');
+  });
+
+  it('retorna vazio quando não há equipes configuradas', () => {
+    expect(gerarTurnosRodizio({ ...regraDuasEquipes, equipes: [] }, '2026-01-01', '2026-01-31')).toEqual([]);
   });
 });

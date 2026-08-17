@@ -23,7 +23,7 @@ import {
   marcarComoCorrigida,
   type InconsistenciaDetalhada,
 } from '../../db/queries/inconsistencias';
-import { listarSobreavisos } from '../../db/queries/sobreaviso';
+import { listarSobreavisosDoColaborador } from '../../db/queries/sobreaviso';
 
 export interface ResultadoExecucaoColaborador {
   colaboradorId: number;
@@ -82,7 +82,7 @@ export async function calcularColaborador(db: D1Database, colaboradorId: number,
   const [atribuicoes, afastamentosDb, sobreavisosDb, feriadosDb, config] = await Promise.all([
     listarAtribuicoesDoColaborador(db, colaboradorId, colaborador.equipeId, colaborador.localidadeId),
     listarAfastamentos(db, { colaboradorId, de: ciclo.inicio, ate: ciclo.fim }),
-    listarSobreavisos(db, { colaboradorId, de: ciclo.inicio, ate: ciclo.fim }),
+    listarSobreavisosDoColaborador(db, colaboradorId, colaborador.equipeId, ciclo.inicio, ciclo.fim),
     listarFeriadosParaColaborador(db, colaborador.ufSigla, colaborador.localidadeId, ciclo.inicio, ciclo.fim),
     buscarConfiguracoesClt(db),
   ]);

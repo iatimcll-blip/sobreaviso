@@ -76,6 +76,27 @@ Uma `sobreaviso_regra` (rodízio automático entre equipes) pode opcionalmente d
 participa do cálculo de rodízio em si (`shared/calculo/rodizio.ts::calcularRodizio` continua
 girando só entre as equipes na ordem definida); não acople a lógica de rotação a `localidadeIds`.
 
+`calcularRodizio`/`calcularStatusRodizios` (`server/services/sobreaviso/rodizio.ts`) só **calculam**
+ao vivo quem está de plantão agora — nada disso grava na tabela `sobreavisos` por conta própria. Pra
+materializar o rodízio como lançamentos reais (necessário pra aparecer em relatórios/exportação e
+pra ser checado pelo motor de CLT), use `gerarSobreavisoAutomatico`, acionado pelo botão de raio ⚡
+por linha em "Regras de rodízio automático" (`SobreavisoPage.tsx`): ele chama
+`shared/calculo/rodizio.ts::gerarTurnosRodizio` (mesma matemática pura de `calcularRodizio`, só que
+avançando turno a turno dentro de um ciclo) e persiste cada turno via
+`criarSobreavisoRodizio` (`origem = 'rodizio_automatico'`, `regra_id` setado — diferente de
+`criarSobreaviso`, que é só pra lançamento manual e sempre grava `origem = 'manual'`). É idempotente
+por design: cada execução primeiro apaga (`excluirSobreavisosGeradosDaRegra`) só o que aquela mesma
+regra já havia gerado automaticamente naquele ciclo antes de recriar — nunca toca em sobreaviso
+lançado manualmente. Pode rodar de novo à vontade se a regra mudar.
+
+O motor de inconsistências enxerga sobreaviso de duas formas — direto no colaborador ou herdado pela
+equipe dele — via `server/db/queries/sobreaviso.ts::listarSobreavisosDoColaborador(db, colaboradorId,
+equipeId, de, ate)` (usada em `calcularColaborador`), que faz `WHERE colaborador_id = ? OR equipe_id
+= ?` explicitamente. **Não** volte a usar `listarSobreavisos({colaboradorId, ...})` ali — aquela
+função filtra por igualdade simples (AND entre os campos passados, não OR) e é a certa pra telas de
+listagem/filtro genérico, mas deixa de enxergar sobreaviso gerado por rodízio (que é sempre
+equipe-scoped, nunca tem `colaborador_id`).
+
 ## Equipes e membros
 
 `colaboradores.equipe_id` (uma equipe por colaborador) e `equipe_membros` (join table com `papel`,

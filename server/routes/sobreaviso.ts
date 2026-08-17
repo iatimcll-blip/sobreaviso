@@ -1,5 +1,6 @@
 import { validar } from '../middleware/validar';
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { sobreavisoEntradaSchema, sobreavisoRegraEntradaSchema } from '../../shared/validation/sobreaviso';
 import { registrarAuditoria } from '../db/queries/auditoria';
 import {
@@ -14,7 +15,7 @@ import {
 } from '../db/queries/sobreaviso';
 import { autenticar } from '../middleware/auth';
 import { requererPermissao } from '../middleware/rbac';
-import { calcularStatusRodizios } from '../services/sobreaviso/rodizio';
+import { calcularStatusRodizios, gerarSobreavisoAutomatico } from '../services/sobreaviso/rodizio';
 import type { AppEnv } from '../types/context';
 
 export const sobreavisoRoutes = new Hono<AppEnv>();
@@ -89,5 +90,30 @@ sobreavisoRoutes.put(
     await registrarAuditoria(c.env.DB, { entidade: 'sobreaviso_regra', entidadeId: id, acao: 'editar', usuarioId: usuario.id, dadosAntes: existente, dadosDepois: dado });
     const regra = await buscarRegra(c.env.DB, id);
     return c.json({ regra });
+  },
+);
+
+sobreavisoRoutes.post(
+  '/regras/:id{[0-9]+}/gerar',
+  requererPermissao('sobreaviso', 'criar'),
+  validar('json', z.object({ ciclo: z.string().regex(/^\d{4}-\d{2}$/, 'Ciclo inválido (use aaaa-mm).') })),
+  async (c) => {
+    const usuario = c.get('usuario');
+    const id = Number(c.req.param('id'));
+    const { ciclo } = c.req.valid('json');
+
+    try {
+      const resultado = await gerarSobreavisoAutomatico(c.env.DB, id, ciclo, usuario.id);
+      await registrarAuditoria(c.env.DB, {
+        entidade: 'sobreaviso_regra',
+        entidadeId: id,
+        acao: 'gerar_automatico',
+        usuarioId: usuario.id,
+        dadosDepois: resultado,
+      });
+      return c.json({ resultado });
+    } catch (erro) {
+      return c.json({ erro: erro instanceof Error ? erro.message : 'Não foi possível gerar o sobreaviso.' }, 400);
+    }
   },
 );

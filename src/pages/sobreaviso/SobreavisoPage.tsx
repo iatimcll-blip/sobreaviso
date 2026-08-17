@@ -1,7 +1,14 @@
-import { Plus, Settings, Users, X } from 'lucide-react';
+import { Plus, Settings, Users, X, Zap } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { cicloAtual } from '@shared/calculo/ciclo';
 import type { Dupla } from '@shared/types/dupla';
-import { STATUS_SOBREAVISO_LABEL, type SobreavisoDetalhado, type SobreavisoRegra, type StatusRodizio } from '@shared/types/sobreaviso';
+import {
+  ORIGEM_SOBREAVISO_LABEL,
+  STATUS_SOBREAVISO_LABEL,
+  type SobreavisoDetalhado,
+  type SobreavisoRegra,
+  type StatusRodizio,
+} from '@shared/types/sobreaviso';
 import { formatarDataHoraBR } from '@shared/format';
 import { PageHeader } from '../../app/layout/PageHeader';
 import { useToast } from '../../app/layout/ToastProvider';
@@ -25,6 +32,9 @@ export function SobreavisoPage() {
   const [modalLancamentoAberto, setModalLancamentoAberto] = useState(false);
   const [regraEmEdicao, setRegraEmEdicao] = useState<SobreavisoRegra | null>(null);
   const [modalRegraAberto, setModalRegraAberto] = useState(false);
+  const [regraParaGerar, setRegraParaGerar] = useState<SobreavisoRegra | null>(null);
+  const [cicloGerar, setCicloGerar] = useState(cicloAtual().rotulo);
+  const [gerando, setGerando] = useState(false);
 
   const podeCriar = temPermissao(usuario, permissoes, 'sobreaviso', 'criar');
   const podeExcluir = temPermissao(usuario, permissoes, 'sobreaviso', 'excluir');
@@ -63,6 +73,33 @@ export function SobreavisoPage() {
       void carregar();
     } catch (erro) {
       notificar(erro instanceof ApiError ? erro.message : 'Não foi possível cancelar.', 'erro');
+    }
+  }
+
+  function abrirGeracao(regra: SobreavisoRegra, evento: React.MouseEvent) {
+    evento.stopPropagation();
+    setCicloGerar(cicloAtual().rotulo);
+    setRegraParaGerar(regra);
+  }
+
+  async function gerarAutomaticamente() {
+    if (!regraParaGerar) return;
+    setGerando(true);
+    try {
+      const resposta = await api.post<{ resultado: { criados: number; removidos: number } }>(
+        `/sobreaviso/regras/${regraParaGerar.id}/gerar`,
+        { ciclo: cicloGerar },
+      );
+      notificar(
+        `${resposta.resultado.criados} plantão(ões) gerado(s) para o ciclo ${cicloGerar}${resposta.resultado.removidos > 0 ? ` (substituindo ${resposta.resultado.removidos} anterior(es))` : ''}.`,
+        'sucesso',
+      );
+      setRegraParaGerar(null);
+      void carregar();
+    } catch (erro) {
+      notificar(erro instanceof ApiError ? erro.message : 'Não foi possível gerar o sobreaviso automaticamente.', 'erro');
+    } finally {
+      setGerando(false);
     }
   }
 
@@ -108,6 +145,7 @@ export function SobreavisoPage() {
               <tr>
                 <th>Alvo</th>
                 <th>Dupla</th>
+                <th>Origem</th>
                 <th>Início</th>
                 <th>Fim</th>
                 <th>Status</th>
@@ -119,6 +157,7 @@ export function SobreavisoPage() {
                 <tr key={s.id}>
                   <td>{s.colaboradorNome ?? s.equipeNome}</td>
                   <td>{s.duplaNome ?? '—'}</td>
+                  <td>{ORIGEM_SOBREAVISO_LABEL[s.origem]}</td>
                   <td>{formatarDataHoraBR(s.inicio)}</td>
                   <td>{formatarDataHoraBR(s.fim)}</td>
                   <td>{STATUS_SOBREAVISO_LABEL[s.status]}</td>
@@ -133,7 +172,7 @@ export function SobreavisoPage() {
               ))}
               {sobreavisos.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="data-table-empty">
+                  <td colSpan={7} className="data-table-empty">
                     Nenhum sobreaviso lançado.
                   </td>
                 </tr>
@@ -171,6 +210,7 @@ export function SobreavisoPage() {
                 <th>Equipes (ordem)</th>
                 <th>Localidades</th>
                 <th>Situação</th>
+                {podeCriar && <th className="col-acoes">Ações</th>}
               </tr>
             </thead>
             <tbody>
@@ -191,11 +231,18 @@ export function SobreavisoPage() {
                   <td>
                     <span className={`badge badge-${regra.ativo ? 'ativo' : 'inativo'}`}>{regra.ativo ? 'Ativa' : 'Inativa'}</span>
                   </td>
+                  {podeCriar && (
+                    <td className="col-acoes">
+                      <button onClick={(e) => abrirGeracao(regra, e)} title="Gerar sobreaviso automaticamente" disabled={regra.equipes.length === 0}>
+                        <Zap size={16} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
               {regras.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="data-table-empty">
+                  <td colSpan={7} className="data-table-empty">
                     Nenhuma regra de rodízio configurada.
                   </td>
                 </tr>
@@ -230,6 +277,39 @@ export function SobreavisoPage() {
             void carregar();
           }}
         />
+      )}
+
+      {regraParaGerar && (
+        <div className="overlay">
+          <div className="modal">
+            <button className="modal-x" onClick={() => setRegraParaGerar(null)} aria-label="Fechar">
+              <X />
+            </button>
+            <span className="modal-icon">
+              <Zap />
+            </span>
+            <h2>Gerar sobreaviso automaticamente</h2>
+            <p>
+              Materializa o rodízio de "{regraParaGerar.nome}" ({regraParaGerar.equipes.map((e) => e.equipeNome).join(' → ')}) como
+              lançamentos reais de sobreaviso no ciclo escolhido. Rodar de novo substitui só o que essa regra já havia gerado
+              automaticamente nesse ciclo — nunca mexe em sobreaviso lançado manualmente.
+            </p>
+
+            <label className="field">
+              Ciclo (aaaa-mm)
+              <input value={cicloGerar} onChange={(e) => setCicloGerar(e.target.value)} placeholder="2026-08" />
+            </label>
+
+            <div className="modal-actions">
+              <button className="outline" onClick={() => setRegraParaGerar(null)}>
+                Cancelar
+              </button>
+              <button className="primary" onClick={() => void gerarAutomaticamente()} disabled={gerando}>
+                {gerando ? 'Gerando…' : 'Gerar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -54,3 +54,25 @@ export function calcularRodizio(regra: RegraRodizio, agora: Date = new Date()): 
     fimTurnoAtual: new Date(fimTurnoAtualMs).toISOString(),
   };
 }
+
+/**
+ * Enumera os turnos sucessivos do rodízio dentro de um período [deISO, ateISO] (datas, inclusive) —
+ * usado pra materializar o rodízio como lançamentos concretos de sobreaviso. Mesma matemática pura
+ * de calcularRodizio, avançando o "agora" turno a turno em vez de olhar um único instante.
+ */
+export function gerarTurnosRodizio(regra: RegraRodizio, deISO: string, ateISO: string): ResultadoRodizio[] {
+  const fimJanelaMs = new Date(`${ateISO}T23:59:59.999Z`).getTime();
+  const resultado: ResultadoRodizio[] = [];
+
+  let cursor = new Date(`${deISO}T00:00:00.000Z`);
+  let ultimoInicio: string | null = null;
+
+  while (cursor.getTime() < fimJanelaMs) {
+    const turno = calcularRodizio(regra, cursor);
+    if (!turno || turno.inicioTurnoAtual === ultimoInicio) break;
+    resultado.push(turno);
+    ultimoInicio = turno.inicioTurnoAtual;
+    cursor = new Date(turno.fimTurnoAtual);
+  }
+  return resultado;
+}

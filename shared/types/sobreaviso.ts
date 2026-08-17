@@ -8,6 +8,14 @@ export const STATUS_SOBREAVISO_LABEL: Record<StatusSobreaviso, string> = {
   cancelado: 'Cancelado',
 };
 
+export const ORIGENS_SOBREAVISO = ['manual', 'rodizio_automatico'] as const;
+export type OrigemSobreaviso = (typeof ORIGENS_SOBREAVISO)[number];
+
+export const ORIGEM_SOBREAVISO_LABEL: Record<OrigemSobreaviso, string> = {
+  manual: 'Manual',
+  rodizio_automatico: 'Rodízio automático',
+};
+
 export interface Sobreaviso {
   id: number;
   colaboradorId: number | null;
@@ -16,7 +24,7 @@ export interface Sobreaviso {
   localidadeId: number | null;
   inicio: string;
   fim: string;
-  origem: 'manual' | 'rodizio_automatico';
+  origem: OrigemSobreaviso;
   regraId: number | null;
   observacoes: string | null;
   status: StatusSobreaviso;
