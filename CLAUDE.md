@@ -34,6 +34,16 @@ construído em 5 fases (ver `README.md` para o status atual e o plano completo s
 - Nomes de variáveis, funções e textos de UI em português (pt-BR), consistente com o domínio do
   produto e o restante do código já escrito.
 
+## Layout
+
+Navegação é uma barra horizontal fixa no topo (`src/app/layout/Topbar.tsx`), não mais sidebar
+vertical. Abaixo de 980px os links de navegação e o chip de "plantão atual" somem da barra e viram
+um dropdown acionado pelo botão `.hamb` (`aberto`/`aoAlternar`/`aoFechar`, estado vive em
+`AppShell` — `src/app/App.tsx`); o card de plantão (`.plantao-atual`) e o perfil do usuário só
+aparecem dentro desse dropdown nessa largura (`.topbar:has(.topbar-dropdown) .topbar-right` no
+`src/styles.css`, não duplicar via prop). `PageHeader` não tem mais hamburger próprio — quem
+controla o menu mobile é só o `Topbar`.
+
 ## Autenticação e autorização
 
 - Sessão: cookie httpOnly com token opaco; o banco (`sessions`) guarda só o hash SHA-256 do token.
@@ -45,13 +55,26 @@ construído em 5 fases (ver `README.md` para o status atual e o plano completo s
   padrão se não houver registro). O frontend (`src/lib/permissions.ts`) espelha o mesmo mapa
   (`CAMPO_POR_ACAO` em `shared/types/permissao.ts`) só para esconder/desabilitar UI — **nunca**
   trate isso como a barreira real ao adicionar uma tela nova.
-- Toda rota de mutação registra em `auditoria` via `server/db/queries/auditoria.ts`.
+- Toda rota de mutação registra em `auditoria` via `server/db/queries/auditoria.ts` — inclusive
+  ações em lote: `PATCH /api/colaboradores/atribuir-equipe` (atribui uma equipe a vários
+  colaboradores de uma vez, usado pela seleção múltipla em `CadastroTab.tsx`) grava um registro de
+  auditoria `editar_equipe` **por colaborador afetado**, não um único registro agregado — mantenha
+  esse padrão granular ao adicionar outras ações em lote.
 
 ## Ciclo de apuração
 
 `shared/calculo/ciclo.ts::getCiclo(data)` é a única função que deve calcular a que ciclo (15 do mês
 → 14 do mês seguinte) uma data pertence. Não recalcule esses limites em outro lugar — importe e
 reutilize essa função (e `diasDoCiclo`/`dataNoCiclo`/`cicloAdjacente`/`formatarPeriodoCiclo`).
+
+## Sobreaviso
+
+Uma `sobreaviso_regra` (rodízio automático entre equipes) pode opcionalmente declarar quais
+`localidades` ela cobre, via a tabela de junção `sobreaviso_regra_localidades`
+(`server/db/queries/sobreaviso.ts::substituirLocalidadesDaRegra`, espelhando o padrão já usado para
+`equipeIds`/`substituirEquipesDaRegra`). Isso é só metadado informativo de cobertura — **não**
+participa do cálculo de rodízio em si (`shared/calculo/rodizio.ts::calcularRodizio` continua
+girando só entre as equipes na ordem definida); não acople a lógica de rotação a `localidadeIds`.
 
 ## Importação de planilhas
 
@@ -164,3 +187,10 @@ genérica de erro, escondendo qual campo era inválido. O wrapper `validar` já 
   antigo manualmente antes de reiniciar.
 - Ao validar autorização, sempre teste também batendo direto na API com um usuário limitado (não só
   escondendo o botão na UI) — é isso que prova que o RBAC está reforçado no servidor.
+- **O `DATABASE_URL` do `.env` local aponta pro Supabase de produção real, não um banco descartável
+  isolado** — dados de colaboradores reais podem aparecer/mudar entre uma consulta e outra (import
+  em paralelo por outra sessão/aba). Ao escrever scripts de verificação (Playwright ou SQL direto):
+  nunca selecione linhas por posição (`nth(0)`, "primeiro checkbox", `LIMIT` sem `WHERE`) pra depois
+  mutar em lote — se a tabela crescer entre o seed e a ação, você acaba editando registros reais.
+  Prefira nomes/IDs exclusivos e óbvios (ex.: prefixo `Teste QA`) tanto pra selecionar quanto pra
+  limpar depois, e sempre confira a contagem de linhas antes de uma ação em massa.

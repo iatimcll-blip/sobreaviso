@@ -1,20 +1,17 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Sidebar } from './layout/Sidebar';
-import { MenuContext } from './layout/MenuContext';
+import { Topbar } from './layout/Topbar';
 
 export function AppShell() {
   const [menuAberto, setMenuAberto] = useState(false);
 
   return (
-    <MenuContext.Provider value={{ abrirMenu: () => setMenuAberto(true) }}>
-      <div className="app">
-        <Sidebar aberto={menuAberto} aoFechar={() => setMenuAberto(false)} />
-        <main>
-          <Outlet />
-        </main>
-        <footer className="app-footer marca-footer">Jarvis MCLL · alloha FIBRA</footer>
-      </div>
-    </MenuContext.Provider>
+    <div className="app">
+      <Topbar aberto={menuAberto} aoAlternar={() => setMenuAberto((atual) => !atual)} aoFechar={() => setMenuAberto(false)} />
+      <main>
+        <Outlet />
+      </main>
+      <footer className="app-footer marca-footer">Jarvis MCLL · alloha FIBRA</footer>
+    </div>
   );
 }

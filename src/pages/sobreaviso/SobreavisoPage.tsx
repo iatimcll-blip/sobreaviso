@@ -169,6 +169,7 @@ export function SobreavisoPage() {
                 <th>Periodicidade</th>
                 <th>Troca</th>
                 <th>Equipes (ordem)</th>
+                <th>Localidades</th>
                 <th>Situação</th>
               </tr>
             </thead>
@@ -186,6 +187,7 @@ export function SobreavisoPage() {
                   <td>{regra.periodicidadeDias} dia(s)</td>
                   <td>{regra.horaTroca}</td>
                   <td>{regra.equipes.map((e) => e.equipeNome).join(' → ')}</td>
+                  <td>{regra.localidades.length > 0 ? regra.localidades.map((l) => l.localidadeNome).join(', ') : '—'}</td>
                   <td>
                     <span className={`badge badge-${regra.ativo ? 'ativo' : 'inativo'}`}>{regra.ativo ? 'Ativa' : 'Inativa'}</span>
                   </td>
@@ -193,7 +195,7 @@ export function SobreavisoPage() {
               ))}
               {regras.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="data-table-empty">
+                  <td colSpan={6} className="data-table-empty">
                     Nenhuma regra de rodízio configurada.
                   </td>
                 </tr>
@@ -221,6 +223,7 @@ export function SobreavisoPage() {
         <SobreavisoRegraFormModal
           regra={regraEmEdicao}
           equipes={referencias.equipes}
+          localidades={referencias.localidades}
           aoFechar={() => setModalRegraAberto(false)}
           aoSalvar={() => {
             setModalRegraAberto(false);

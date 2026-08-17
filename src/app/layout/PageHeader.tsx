@@ -1,6 +1,4 @@
-import { Menu } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useMenu } from './MenuContext';
 
 const FORMATADOR_DATA = new Intl.DateTimeFormat('pt-BR', {
   weekday: 'long',
@@ -14,13 +12,8 @@ function capitalizar(texto: string): string {
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
-  const { abrirMenu } = useMenu();
-
   return (
     <header>
-      <button className="hamb" onClick={abrirMenu} aria-label="Abrir menu">
-        <Menu />
-      </button>
       <div>
         <p>{subtitle ?? capitalizar(FORMATADOR_DATA.format(new Date()))}</p>
         <h1>{title}</h1>

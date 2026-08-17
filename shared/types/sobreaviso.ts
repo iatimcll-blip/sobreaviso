@@ -47,6 +47,11 @@ export interface SobreavisoRegraEquipe {
   equipeNome: string;
 }
 
+export interface SobreavisoRegraLocalidade {
+  localidadeId: number;
+  localidadeNome: string;
+}
+
 export interface SobreavisoRegra {
   id: number;
   nome: string;
@@ -56,6 +61,7 @@ export interface SobreavisoRegra {
   ativo: boolean;
   observacoes: string | null;
   equipes: SobreavisoRegraEquipe[];
+  localidades: SobreavisoRegraLocalidade[];
 }
 
 export interface SobreavisoRegraEntrada {
@@ -66,6 +72,7 @@ export interface SobreavisoRegraEntrada {
   ativo?: boolean;
   observacoes?: string | null;
   equipeIds: number[];
+  localidadeIds?: number[];
 }
 
 export interface StatusRodizio {

@@ -21,6 +21,9 @@ export function CadastroTab() {
   const [busca, setBusca] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [colaboradorEmEdicao, setColaboradorEmEdicao] = useState<ColaboradorDetalhado | null>(null);
+  const [selecionados, setSelecionados] = useState<number[]>([]);
+  const [equipeEmLote, setEquipeEmLote] = useState('');
+  const [atribuindo, setAtribuindo] = useState(false);
 
   const podeCriar = temPermissao(usuario, permissoes, 'colaboradores', 'criar');
   const podeEditar = temPermissao(usuario, permissoes, 'colaboradores', 'editar');
@@ -45,6 +48,38 @@ export function CadastroTab() {
     const debounce = setTimeout(() => void carregar(), 300);
     return () => clearTimeout(debounce);
   }, [carregar]);
+
+  useEffect(() => {
+    const idsVisiveis = new Set(colaboradores.map((c) => c.id));
+    setSelecionados((atual) => atual.filter((id) => idsVisiveis.has(id)));
+  }, [colaboradores]);
+
+  function alternarSelecao(id: number) {
+    setSelecionados((atual) => (atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id]));
+  }
+
+  function alternarSelecaoTodos() {
+    setSelecionados((atual) => (atual.length === colaboradores.length ? [] : colaboradores.map((c) => c.id)));
+  }
+
+  async function atribuirEquipeEmLote() {
+    if (selecionados.length === 0) return;
+    setAtribuindo(true);
+    try {
+      await api.patch('/colaboradores/atribuir-equipe', {
+        colaboradorIds: selecionados,
+        equipeId: equipeEmLote ? Number(equipeEmLote) : null,
+      });
+      notificar(`Equipe atualizada para ${selecionados.length} colaborador(es).`, 'sucesso');
+      setSelecionados([]);
+      setEquipeEmLote('');
+      void carregar();
+    } catch (erro) {
+      notificar(erro instanceof ApiError ? erro.message : 'Não foi possível atualizar a equipe em lote.', 'erro');
+    } finally {
+      setAtribuindo(false);
+    }
+  }
 
   function abrirNovo() {
     setColaboradorEmEdicao(null);
@@ -110,10 +145,38 @@ export function CadastroTab() {
           </div>
         </div>
 
+        {podeEditar && selecionados.length > 0 && (
+          <div className="bulk-action-bar">
+            <span>{selecionados.length} colaborador(es) selecionado(s)</span>
+            <select value={equipeEmLote} onChange={(e) => setEquipeEmLote(e.target.value)}>
+              <option value="">Sem equipe</option>
+              {referencias.equipes.map((equipe) => (
+                <option key={equipe.id} value={equipe.id}>
+                  {equipe.nome}
+                </option>
+              ))}
+            </select>
+            <button className="primary" disabled={atribuindo} onClick={() => void atribuirEquipeEmLote()}>
+              Atribuir equipe
+            </button>
+            <button onClick={() => setSelecionados([])}>Cancelar</button>
+          </div>
+        )}
+
         <div className="data-table-wrap">
           <table className="data-table">
             <thead>
               <tr>
+                {podeEditar && (
+                  <th className="col-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={colaboradores.length > 0 && selecionados.length === colaboradores.length}
+                      onChange={alternarSelecaoTodos}
+                      aria-label="Selecionar todos"
+                    />
+                  </th>
+                )}
                 <th>Colaborador</th>
                 <th>Função</th>
                 <th>Equipe</th>
@@ -126,6 +189,16 @@ export function CadastroTab() {
             <tbody>
               {colaboradores.map((colaborador) => (
                 <tr key={colaborador.id} onClick={() => abrirEdicao(colaborador)}>
+                  {podeEditar && (
+                    <td className="col-checkbox" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selecionados.includes(colaborador.id)}
+                        onChange={() => alternarSelecao(colaborador.id)}
+                        aria-label={`Selecionar ${colaborador.nome}`}
+                      />
+                    </td>
+                  )}
                   <td>
                     <b>{colaborador.nome}</b>
                     {colaborador.matricula && <div><small>{colaborador.matricula}</small></div>}

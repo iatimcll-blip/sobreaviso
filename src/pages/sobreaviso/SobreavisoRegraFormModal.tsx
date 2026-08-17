@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, BellRing, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Equipe } from '@shared/types/equipe';
+import type { Localidade } from '@shared/types/localidade';
 import type { SobreavisoRegra, SobreavisoRegraEntrada } from '@shared/types/sobreaviso';
 import { ApiError, api } from '../../lib/api-client';
 import { useToast } from '../../app/layout/ToastProvider';
@@ -8,6 +9,7 @@ import { useToast } from '../../app/layout/ToastProvider';
 interface Props {
   regra: SobreavisoRegra | null;
   equipes: Equipe[];
+  localidades: Localidade[];
   aoFechar: () => void;
   aoSalvar: () => void;
 }
@@ -15,10 +17,19 @@ interface Props {
 const hoje = () => new Date().toISOString().slice(0, 10);
 
 function formVazio(): SobreavisoRegraEntrada {
-  return { nome: '', periodicidadeDias: 7, horaTroca: '07:00', dataInicio: hoje(), ativo: true, observacoes: '', equipeIds: [] };
+  return {
+    nome: '',
+    periodicidadeDias: 7,
+    horaTroca: '07:00',
+    dataInicio: hoje(),
+    ativo: true,
+    observacoes: '',
+    equipeIds: [],
+    localidadeIds: [],
+  };
 }
 
-export function SobreavisoRegraFormModal({ regra, equipes, aoFechar, aoSalvar }: Props) {
+export function SobreavisoRegraFormModal({ regra, equipes, localidades, aoFechar, aoSalvar }: Props) {
   const { notificar } = useToast();
   const [form, setForm] = useState<SobreavisoRegraEntrada>(formVazio());
   const [erro, setErro] = useState<string | null>(null);
@@ -34,12 +45,26 @@ export function SobreavisoRegraFormModal({ regra, equipes, aoFechar, aoSalvar }:
         ativo: regra.ativo,
         observacoes: regra.observacoes ?? '',
         equipeIds: regra.equipes.sort((a, b) => a.ordem - b.ordem).map((e) => e.equipeId),
+        localidadeIds: regra.localidades.map((l) => l.localidadeId),
       });
     } else {
       setForm(formVazio());
     }
     setErro(null);
   }, [regra]);
+
+  const localidadesCobertas = (form.localidadeIds ?? [])
+    .map((id) => localidades.find((l) => l.id === id))
+    .filter((l): l is Localidade => Boolean(l));
+  const localidadesDisponiveis = localidades.filter((l) => !(form.localidadeIds ?? []).includes(l.id));
+
+  function alternarLocalidade(id: number) {
+    const atuais = form.localidadeIds ?? [];
+    setForm({
+      ...form,
+      localidadeIds: atuais.includes(id) ? atuais.filter((item) => item !== id) : [...atuais, id],
+    });
+  }
 
   const equipesNoRodizio = form.equipeIds.map((id) => equipes.find((e) => e.id === id)).filter((e): e is Equipe => Boolean(e));
   const equipesDisponiveis = equipes.filter((e) => !form.equipeIds.includes(e.id));
@@ -177,6 +202,39 @@ export function SobreavisoRegraFormModal({ regra, equipes, aoFechar, aoSalvar }:
                 {equipesDisponiveis.map((equipe) => (
                   <option key={equipe.id} value={equipe.id}>
                     {equipe.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        <div className="field">
+          Localidades cobertas por esta regra
+          <p className="field-hint">Opcional — use para uma regra de rodízio que atende mais de uma localidade.</p>
+          <div className="chip-list">
+            {localidadesCobertas.map((localidade) => (
+              <span className="chip-removable" key={localidade.id}>
+                {localidade.nome}
+                <button type="button" onClick={() => alternarLocalidade(localidade.id)} aria-label={`Remover ${localidade.nome}`}>
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            {localidadesCobertas.length === 0 && <span className="chip-list-vazio">Nenhuma localidade vinculada ainda.</span>}
+          </div>
+          {localidadesDisponiveis.length > 0 && (
+            <div className="table-toolbar mt-10">
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) alternarLocalidade(Number(e.target.value));
+                }}
+              >
+                <option value="">Adicionar localidade…</option>
+                {localidadesDisponiveis.map((localidade) => (
+                  <option key={localidade.id} value={localidade.id}>
+                    {localidade.nome}
                   </option>
                 ))}
               </select>

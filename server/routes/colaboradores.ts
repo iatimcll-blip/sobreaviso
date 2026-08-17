@@ -1,10 +1,11 @@
 import { validar } from '../middleware/validar';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { colaboradorEntradaSchema, colaboradorFiltroSchema } from '../../shared/validation/colaborador';
+import { colaboradorAtribuirEquipeSchema, colaboradorEntradaSchema, colaboradorFiltroSchema } from '../../shared/validation/colaborador';
 import { SITUACOES_CADASTRAIS } from '../../shared/types/colaborador';
 import { registrarAuditoria } from '../db/queries/auditoria';
 import {
+  atribuirEquipeEmLote,
   atualizarColaborador,
   buscarColaboradorPorId,
   criarColaborador,
@@ -90,6 +91,40 @@ colaboradoresRoutes.patch(
     });
     const colaborador = await buscarColaboradorPorId(c.env.DB, id);
     return c.json({ colaborador });
+  },
+);
+
+colaboradoresRoutes.patch(
+  '/atribuir-equipe',
+  requererPermissao('colaboradores', 'editar'),
+  validar('json', colaboradorAtribuirEquipeSchema),
+  async (c) => {
+    const usuario = c.get('usuario');
+    const { colaboradorIds, equipeId } = c.req.valid('json');
+
+    const existentes = await Promise.all(colaboradorIds.map((id) => buscarColaboradorPorId(c.env.DB, id)));
+    const encontrados = existentes.filter((colaborador): colaborador is NonNullable<typeof colaborador> => colaborador !== null);
+    if (encontrados.length === 0) return c.json({ erro: 'Nenhum colaborador encontrado.' }, 404);
+
+    await atribuirEquipeEmLote(
+      c.env.DB,
+      encontrados.map((colaborador) => colaborador.id),
+      equipeId,
+      usuario.id,
+    );
+
+    for (const colaborador of encontrados) {
+      await registrarAuditoria(c.env.DB, {
+        entidade: 'colaborador',
+        entidadeId: colaborador.id,
+        acao: 'editar_equipe',
+        usuarioId: usuario.id,
+        dadosAntes: { equipeId: colaborador.equipeId },
+        dadosDepois: { equipeId },
+      });
+    }
+
+    return c.json({ atualizados: encontrados.length });
   },
 );
 

@@ -23,6 +23,11 @@ export const colaboradorEntradaSchema = z.object({
 
 export type ColaboradorEntradaValidada = z.infer<typeof colaboradorEntradaSchema>;
 
+export const colaboradorAtribuirEquipeSchema = z.object({
+  colaboradorIds: z.array(z.number().int().positive()).min(1, 'Selecione ao menos um colaborador.'),
+  equipeId: z.number().int().positive().nullable(),
+});
+
 export const colaboradorFiltroSchema = z.object({
   busca: z.string().trim().optional(),
   equipeId: z.coerce.number().int().positive().optional(),

@@ -194,6 +194,20 @@ export async function definirSituacaoCadastral(
   );
 }
 
+export async function atribuirEquipeEmLote(
+  db: D1Database,
+  colaboradorIds: number[],
+  equipeId: number | null,
+  usuarioId: number | null,
+): Promise<void> {
+  const placeholders = colaboradorIds.map(() => '?').join(', ');
+  await execute(
+    db,
+    `UPDATE colaboradores SET equipe_id = ?, atualizado_por = ?, atualizado_em = datetime('now') WHERE id IN (${placeholders})`,
+    [equipeId, usuarioId, ...colaboradorIds],
+  );
+}
+
 export async function excluirColaborador(db: D1Database, id: number): Promise<void> {
   await execute(db, 'DELETE FROM colaboradores WHERE id = ?', [id]);
 }

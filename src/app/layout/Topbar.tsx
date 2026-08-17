@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Menu } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import type { SobreavisoDetalhado, StatusRodizio } from '@shared/types/sobreaviso';
 import { api } from '../../lib/api-client';
@@ -71,45 +72,51 @@ function usePlantaoAtual(): PlantaoAtual | null {
   return plantao;
 }
 
-export function Sidebar({ aberto, aoFechar }: { aberto: boolean; aoFechar: () => void }) {
+interface Props {
+  aberto: boolean;
+  aoAlternar: () => void;
+  aoFechar: () => void;
+}
+
+export function Topbar({ aberto, aoAlternar, aoFechar }: Props) {
   const { usuario, logout } = useAuth();
   const plantao = usePlantaoAtual();
 
   return (
-    <aside className={aberto ? 'sidebar mobile-open' : 'sidebar'}>
-      <div className="brand">
+    <header className="topbar">
+      <div className="topbar-brand">
         <div className="logo">S</div>
         <div>
           <strong>Sobreaviso</strong>
           <span>Gestão de escalas</span>
         </div>
-        <button className="close" onClick={aoFechar} aria-label="Fechar menu">
-          <X />
-        </button>
       </div>
 
-      <nav>
+      <button className="hamb" onClick={aoAlternar} aria-label={aberto ? 'Fechar menu' : 'Abrir menu'}>
+        {aberto ? <X /> : <Menu />}
+      </button>
+
+      <nav className="topbar-nav">
         {NAV_ITEMS.map(({ to, label, icon: Icon, fim }) => (
-          <NavLink key={to} to={to} end={fim} onClick={aoFechar}>
-            <Icon size={19} />
+          <NavLink key={to} to={to} end={fim}>
+            <Icon size={18} />
             {label}
           </NavLink>
         ))}
       </nav>
 
-      <div className="side-bottom">
+      <div className="topbar-right">
         {plantao && (
-          <div className="plantao-atual">
+          <div className="plantao-chip" title={plantao.local ?? undefined}>
             <span className="plantao-atual-dot" aria-hidden="true" />
-            <div className="plantao-atual-info">
-              <span className="plantao-atual-label">Em plantão agora</span>
-              <span className="plantao-atual-nome">{plantao.nome}</span>
-              {plantao.local && <span className="plantao-atual-local">{plantao.local}</span>}
+            <div>
+              <b>{plantao.nome}</b>
+              {plantao.local && <small>{plantao.local}</small>}
             </div>
           </div>
         )}
         {usuario && (
-          <div className="profile">
+          <div className="topbar-profile">
             <span>{iniciais(usuario.nomeCompleto)}</span>
             <div>
               <b>{usuario.nomeCompleto}</b>
@@ -121,6 +128,29 @@ export function Sidebar({ aberto, aoFechar }: { aberto: boolean; aoFechar: () =>
           </div>
         )}
       </div>
-    </aside>
+
+      {aberto && (
+        <div className="topbar-dropdown">
+          <nav>
+            {NAV_ITEMS.map(({ to, label, icon: Icon, fim }) => (
+              <NavLink key={to} to={to} end={fim} onClick={aoFechar}>
+                <Icon size={19} />
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+          {plantao && (
+            <div className="plantao-atual">
+              <span className="plantao-atual-dot" aria-hidden="true" />
+              <div className="plantao-atual-info">
+                <span className="plantao-atual-label">Em plantão agora</span>
+                <span className="plantao-atual-nome">{plantao.nome}</span>
+                {plantao.local && <span className="plantao-atual-local">{plantao.local}</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </header>
   );
 }

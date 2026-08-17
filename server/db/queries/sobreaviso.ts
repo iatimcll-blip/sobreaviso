@@ -169,6 +169,11 @@ interface RegraEquipeRow {
   equipe_nome: string;
 }
 
+interface RegraLocalidadeRow {
+  localidade_id: number;
+  localidade_nome: string;
+}
+
 async function anexarEquipes(db: D1Database, regras: RegraRow[]): Promise<SobreavisoRegra[]> {
   const resultado: SobreavisoRegra[] = [];
   for (const regra of regras) {
@@ -176,6 +181,12 @@ async function anexarEquipes(db: D1Database, regras: RegraRow[]): Promise<Sobrea
       db,
       `SELECT re.equipe_id, re.ordem, eq.nome AS equipe_nome FROM sobreaviso_regra_equipes re
        JOIN equipes eq ON eq.id = re.equipe_id WHERE re.regra_id = ? ORDER BY re.ordem ASC`,
+      [regra.id],
+    );
+    const localidades = await query<RegraLocalidadeRow>(
+      db,
+      `SELECT rl.localidade_id, loc.nome AS localidade_nome FROM sobreaviso_regra_localidades rl
+       JOIN localidades loc ON loc.id = rl.localidade_id WHERE rl.regra_id = ? ORDER BY loc.nome ASC`,
       [regra.id],
     );
     resultado.push({
@@ -187,6 +198,7 @@ async function anexarEquipes(db: D1Database, regras: RegraRow[]): Promise<Sobrea
       ativo: regra.ativo === 1,
       observacoes: regra.observacoes,
       equipes: equipes.map((e) => ({ equipeId: e.equipe_id, ordem: e.ordem, equipeNome: e.equipe_nome })),
+      localidades: localidades.map((l) => ({ localidadeId: l.localidade_id, localidadeNome: l.localidade_nome })),
     });
   }
   return resultado;
@@ -216,6 +228,13 @@ async function substituirEquipesDaRegra(db: D1Database, regraId: number, equipeI
   }
 }
 
+async function substituirLocalidadesDaRegra(db: D1Database, regraId: number, localidadeIds: number[]): Promise<void> {
+  await execute(db, 'DELETE FROM sobreaviso_regra_localidades WHERE regra_id = ?', [regraId]);
+  for (const localidadeId of localidadeIds) {
+    await execute(db, 'INSERT INTO sobreaviso_regra_localidades (regra_id, localidade_id) VALUES (?, ?)', [regraId, localidadeId]);
+  }
+}
+
 export async function criarRegra(db: D1Database, dado: SobreavisoRegraEntrada): Promise<number> {
   const resultado = await execute(
     db,
@@ -224,6 +243,7 @@ export async function criarRegra(db: D1Database, dado: SobreavisoRegraEntrada): 
   );
   const id = Number(resultado.meta.last_row_id);
   await substituirEquipesDaRegra(db, id, dado.equipeIds);
+  await substituirLocalidadesDaRegra(db, id, dado.localidadeIds ?? []);
   return id;
 }
 
@@ -234,4 +254,5 @@ export async function atualizarRegra(db: D1Database, id: number, dado: Sobreavis
     [dado.nome, dado.periodicidadeDias, dado.horaTroca, dado.dataInicio, dado.ativo === false ? 0 : 1, dado.observacoes ?? null, id],
   );
   await substituirEquipesDaRegra(db, id, dado.equipeIds);
+  await substituirLocalidadesDaRegra(db, id, dado.localidadeIds ?? []);
 }

@@ -28,4 +28,5 @@ export const sobreavisoRegraEntradaSchema = z.object({
   ativo: z.boolean().default(true),
   observacoes: z.string().trim().max(500).nullish(),
   equipeIds: z.array(z.number().int().positive()).min(1, 'Selecione ao menos uma equipe.'),
+  localidadeIds: z.array(z.number().int().positive()).optional().default([]),
 });
