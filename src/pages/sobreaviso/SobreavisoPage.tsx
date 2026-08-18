@@ -22,6 +22,13 @@ import { SobreavisoRegraFormModal } from './SobreavisoRegraFormModal';
 
 type AlvoGeracao = { tipo: 'regra'; regra: SobreavisoRegra } | { tipo: 'geral' };
 
+interface TurnoGeradoView {
+  regraNome?: string;
+  equipeNome: string;
+  inicio: string;
+  fim: string;
+}
+
 export function SobreavisoPage() {
   const { usuario, permissoes } = useAuth();
   const { notificar } = useToast();
@@ -37,6 +44,7 @@ export function SobreavisoPage() {
   const [alvoGeracao, setAlvoGeracao] = useState<AlvoGeracao | null>(null);
   const [cicloGerar, setCicloGerar] = useState(cicloAtual().rotulo);
   const [gerando, setGerando] = useState(false);
+  const [resultadoGeracao, setResultadoGeracao] = useState<TurnoGeradoView[] | null>(null);
 
   const podeCriar = temPermissao(usuario, permissoes, 'sobreaviso', 'criar');
   const podeExcluir = temPermissao(usuario, permissoes, 'sobreaviso', 'excluir');
@@ -81,12 +89,19 @@ export function SobreavisoPage() {
   function abrirGeracao(regra: SobreavisoRegra, evento: React.MouseEvent) {
     evento.stopPropagation();
     setCicloGerar(cicloAtual().rotulo);
+    setResultadoGeracao(null);
     setAlvoGeracao({ tipo: 'regra', regra });
   }
 
   function abrirGeracaoGeral() {
     setCicloGerar(cicloAtual().rotulo);
+    setResultadoGeracao(null);
     setAlvoGeracao({ tipo: 'geral' });
+  }
+
+  function fecharModalGeracao() {
+    setAlvoGeracao(null);
+    setResultadoGeracao(null);
   }
 
   async function gerarAutomaticamente() {
@@ -94,7 +109,7 @@ export function SobreavisoPage() {
     setGerando(true);
     try {
       if (alvoGeracao.tipo === 'regra') {
-        const resposta = await api.post<{ resultado: { criados: number; removidos: number } }>(
+        const resposta = await api.post<{ resultado: { criados: number; removidos: number; turnos: TurnoGeradoView[] } }>(
           `/sobreaviso/regras/${alvoGeracao.regra.id}/gerar`,
           { ciclo: cicloGerar },
         );
@@ -102,19 +117,26 @@ export function SobreavisoPage() {
           `${resposta.resultado.criados} plantão(ões) gerado(s) para o ciclo ${cicloGerar}${resposta.resultado.removidos > 0 ? ` (substituindo ${resposta.resultado.removidos} anterior(es))` : ''}.`,
           'sucesso',
         );
+        setResultadoGeracao(resposta.resultado.turnos);
       } else {
         const resposta = await api.post<{
-          resultado: { regrasProcessadas: number; regrasComErro: number; totalCriados: number; totalRemovidos: number };
+          resultado: {
+            regrasProcessadas: number;
+            regrasComErro: number;
+            totalCriados: number;
+            totalRemovidos: number;
+            detalhes: { regraNome: string; turnos: TurnoGeradoView[] }[];
+          };
         }>('/sobreaviso/regras/gerar-todas', { ciclo: cicloGerar });
-        const { regrasProcessadas, regrasComErro, totalCriados, totalRemovidos } = resposta.resultado;
+        const { regrasProcessadas, regrasComErro, totalCriados, totalRemovidos, detalhes } = resposta.resultado;
         notificar(
           `${totalCriados} plantão(ões) gerado(s) em ${regrasProcessadas} regra(s) para o ciclo ${cicloGerar}` +
             `${totalRemovidos > 0 ? ` (substituindo ${totalRemovidos} anterior(es))` : ''}` +
             `${regrasComErro > 0 ? ` — ${regrasComErro} regra(s) ignorada(s) por não ter equipes configuradas` : ''}.`,
           'sucesso',
         );
+        setResultadoGeracao(detalhes.flatMap((d) => d.turnos.map((t) => ({ ...t, regraNome: d.regraNome }))));
       }
-      setAlvoGeracao(null);
       void carregar();
     } catch (erro) {
       notificar(erro instanceof ApiError ? erro.message : 'Não foi possível gerar o sobreaviso automaticamente.', 'erro');
@@ -308,40 +330,89 @@ export function SobreavisoPage() {
       {alvoGeracao && (
         <div className="overlay">
           <div className="modal">
-            <button className="modal-x" onClick={() => setAlvoGeracao(null)} aria-label="Fechar">
+            <button className="modal-x" onClick={fecharModalGeracao} aria-label="Fechar">
               <X />
             </button>
             <span className="modal-icon">
               <Zap />
             </span>
             <h2>Gerar sobreaviso automaticamente</h2>
-            {alvoGeracao.tipo === 'regra' ? (
-              <p>
-                Materializa o rodízio de "{alvoGeracao.regra.nome}" ({alvoGeracao.regra.equipes.map((e) => e.equipeNome).join(' → ')})
-                como lançamentos reais de sobreaviso no ciclo escolhido. Rodar de novo substitui só o que essa regra já havia gerado
-                automaticamente nesse ciclo — nunca mexe em sobreaviso lançado manualmente.
-              </p>
+
+            {resultadoGeracao ? (
+              <>
+                <p>
+                  {resultadoGeracao.length} plantão(ões) lançado(s) para o ciclo {cicloGerar}:
+                </p>
+                <div className="data-table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        {alvoGeracao.tipo === 'geral' && <th>Regra</th>}
+                        <th>Equipe</th>
+                        <th>Início</th>
+                        <th>Fim</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resultadoGeracao.map((t, indice) => (
+                        <tr key={`${t.equipeNome}-${t.inicio}-${indice}`}>
+                          {alvoGeracao.tipo === 'geral' && <td>{t.regraNome}</td>}
+                          <td>{t.equipeNome}</td>
+                          <td>{formatarDataHoraBR(t.inicio)}</td>
+                          <td>{formatarDataHoraBR(t.fim)}</td>
+                        </tr>
+                      ))}
+                      {resultadoGeracao.length === 0 && (
+                        <tr>
+                          <td colSpan={alvoGeracao.tipo === 'geral' ? 4 : 3} className="data-table-empty">
+                            Nenhum turno cai dentro desse ciclo.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="modal-actions">
+                  <button className="outline" onClick={() => setResultadoGeracao(null)}>
+                    Gerar outro ciclo
+                  </button>
+                  <button className="primary" onClick={fecharModalGeracao}>
+                    Fechar
+                  </button>
+                </div>
+              </>
             ) : (
-              <p>
-                Materializa o rodízio de <b>todas as regras ativas</b> ({regras.filter((r) => r.ativo && r.equipes.length > 0).length})
-                como lançamentos reais de sobreaviso no ciclo escolhido. Rodar de novo substitui só o que cada regra já havia gerado
-                automaticamente nesse ciclo — nunca mexe em sobreaviso lançado manualmente.
-              </p>
+              <>
+                {alvoGeracao.tipo === 'regra' ? (
+                  <p>
+                    Materializa o rodízio de "{alvoGeracao.regra.nome}" ({alvoGeracao.regra.equipes.map((e) => e.equipeNome).join(' → ')})
+                    como lançamentos reais de sobreaviso no ciclo escolhido. Rodar de novo substitui só o que essa regra já havia gerado
+                    automaticamente nesse ciclo — nunca mexe em sobreaviso lançado manualmente.
+                  </p>
+                ) : (
+                  <p>
+                    Materializa o rodízio de <b>todas as regras ativas</b> ({regras.filter((r) => r.ativo && r.equipes.length > 0).length})
+                    como lançamentos reais de sobreaviso no ciclo escolhido. Rodar de novo substitui só o que cada regra já havia gerado
+                    automaticamente nesse ciclo — nunca mexe em sobreaviso lançado manualmente.
+                  </p>
+                )}
+
+                <label className="field">
+                  Ciclo (aaaa-mm)
+                  <input value={cicloGerar} onChange={(e) => setCicloGerar(e.target.value)} placeholder="2026-08" />
+                </label>
+
+                <div className="modal-actions">
+                  <button className="outline" onClick={fecharModalGeracao}>
+                    Cancelar
+                  </button>
+                  <button className="primary" onClick={() => void gerarAutomaticamente()} disabled={gerando}>
+                    {gerando ? 'Gerando…' : 'Gerar'}
+                  </button>
+                </div>
+              </>
             )}
-
-            <label className="field">
-              Ciclo (aaaa-mm)
-              <input value={cicloGerar} onChange={(e) => setCicloGerar(e.target.value)} placeholder="2026-08" />
-            </label>
-
-            <div className="modal-actions">
-              <button className="outline" onClick={() => setAlvoGeracao(null)}>
-                Cancelar
-              </button>
-              <button className="primary" onClick={() => void gerarAutomaticamente()} disabled={gerando}>
-                {gerando ? 'Gerando…' : 'Gerar'}
-              </button>
-            </div>
           </div>
         </div>
       )}

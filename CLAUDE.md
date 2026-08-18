@@ -90,7 +90,11 @@ avançando turno a turno dentro de um ciclo) e persiste cada turno via
 uma regra que falhar (ex.: sem equipes) só é contada em `regrasComErro`, não derruba as demais. É
 idempotente por design: cada execução primeiro apaga (`excluirSobreavisosGeradosDaRegra`) só o que
 aquela mesma regra já havia gerado automaticamente naquele ciclo antes de recriar — nunca toca em
-sobreaviso lançado manualmente. Pode rodar de novo à vontade se a regra mudar. **Cuidado ao mexer em
+sobreaviso lançado manualmente. Pode rodar de novo à vontade se a regra mudar. Ambas as funções
+devolvem a lista de `turnos`/`detalhes[].turnos` (`equipeId/equipeNome/inicio/fim`) — não só as
+contagens — porque `SobreavisoPage.tsx` mantém o modal aberto após gerar e renderiza essa lista numa
+tabela (`resultadoGeracao`) em vez de fechar direto; ao alterar a resposta dessas funções, mantenha
+esse campo, é consumido pela UI. **Cuidado ao mexer em
 `excluirSobreavisosGeradosDaRegra`**: o filtro é por sobreposição (`fim > de AND inicio <= ate`), não
 `inicio >= de` — quando a `periodicidadeDias` da regra não bate exatamente com a virada do ciclo
 (ex.: periodicidade de 10 dias), o primeiro turno do ciclo pode começar *antes* de `de`

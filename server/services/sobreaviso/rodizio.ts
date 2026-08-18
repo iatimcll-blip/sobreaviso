@@ -29,11 +29,19 @@ export async function calcularStatusRodizios(db: D1Database, agora: Date = new D
   return resultado;
 }
 
+export interface TurnoGerado {
+  equipeId: number;
+  equipeNome: string;
+  inicio: string;
+  fim: string;
+}
+
 export interface ResultadoGeracaoSobreaviso {
   regraId: number;
   cicloRotulo: string;
   removidos: number;
   criados: number;
+  turnos: TurnoGerado[];
 }
 
 /**
@@ -61,17 +69,22 @@ export async function gerarSobreavisoAutomatico(
 
   const removidos = await excluirSobreavisosGeradosDaRegra(db, regraId, `${ciclo.inicio}T00:00:00.000Z`, `${ciclo.fim}T23:59:59.999Z`);
 
-  let criados = 0;
+  const turnosGerados: TurnoGerado[] = [];
   for (const turno of turnos) {
     await criarSobreavisoRodizio(
       db,
       { equipeId: turno.equipeAtual.equipeId, regraId, inicio: turno.inicioTurnoAtual, fim: turno.fimTurnoAtual },
       usuarioId,
     );
-    criados += 1;
+    turnosGerados.push({
+      equipeId: turno.equipeAtual.equipeId,
+      equipeNome: turno.equipeAtual.equipeNome,
+      inicio: turno.inicioTurnoAtual,
+      fim: turno.fimTurnoAtual,
+    });
   }
 
-  return { regraId, cicloRotulo, removidos, criados };
+  return { regraId, cicloRotulo, removidos, criados: turnosGerados.length, turnos: turnosGerados };
 }
 
 export interface ResultadoGeracaoSobreavisoGeral {
