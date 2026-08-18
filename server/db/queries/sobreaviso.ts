@@ -185,11 +185,17 @@ export async function criarSobreavisoRodizio(db: D1Database, dado: SobreavisoRod
   return Number(resultado.meta.last_row_id);
 }
 
-/** Remove os lançamentos gerados automaticamente por uma regra num período — para regenerar de forma idempotente. */
+/**
+ * Remove os lançamentos gerados automaticamente por uma regra que se sobrepõem a um período — pra
+ * regenerar de forma idempotente. Overlap (`fim > de AND inicio <= ate`), não `inicio >= de`: o
+ * primeiro turno de um ciclo pode começar antes de `de` quando a periodicidade da regra não bate
+ * exatamente com a virada do ciclo (ex.: periodicidade de 10 dias) — um filtro só por `inicio` deixa
+ * esse turno para trás a cada regeneração, acumulando duplicata.
+ */
 export async function excluirSobreavisosGeradosDaRegra(db: D1Database, regraId: number, de: string, ate: string): Promise<number> {
   const resultado = await execute(
     db,
-    `DELETE FROM sobreavisos WHERE regra_id = ? AND origem = 'rodizio_automatico' AND inicio >= ? AND inicio <= ? RETURNING id`,
+    `DELETE FROM sobreavisos WHERE regra_id = ? AND origem = 'rodizio_automatico' AND fim > ? AND inicio <= ? RETURNING id`,
     [regraId, de, ate],
   );
   return resultado.results.length;

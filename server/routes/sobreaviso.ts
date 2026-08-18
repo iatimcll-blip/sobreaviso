@@ -15,7 +15,7 @@ import {
 } from '../db/queries/sobreaviso';
 import { autenticar } from '../middleware/auth';
 import { requererPermissao } from '../middleware/rbac';
-import { calcularStatusRodizios, gerarSobreavisoAutomatico } from '../services/sobreaviso/rodizio';
+import { calcularStatusRodizios, gerarSobreavisoAutomatico, gerarSobreavisoAutomaticoTodasRegras } from '../services/sobreaviso/rodizio';
 import type { AppEnv } from '../types/context';
 
 export const sobreavisoRoutes = new Hono<AppEnv>();
@@ -115,5 +115,25 @@ sobreavisoRoutes.post(
     } catch (erro) {
       return c.json({ erro: erro instanceof Error ? erro.message : 'Não foi possível gerar o sobreaviso.' }, 400);
     }
+  },
+);
+
+sobreavisoRoutes.post(
+  '/regras/gerar-todas',
+  requererPermissao('sobreaviso', 'criar'),
+  validar('json', z.object({ ciclo: z.string().regex(/^\d{4}-\d{2}$/, 'Ciclo inválido (use aaaa-mm).') })),
+  async (c) => {
+    const usuario = c.get('usuario');
+    const { ciclo } = c.req.valid('json');
+
+    const resultado = await gerarSobreavisoAutomaticoTodasRegras(c.env.DB, ciclo, usuario.id);
+    await registrarAuditoria(c.env.DB, {
+      entidade: 'sobreaviso_regra',
+      entidadeId: null,
+      acao: 'gerar_automatico_geral',
+      usuarioId: usuario.id,
+      dadosDepois: resultado,
+    });
+    return c.json({ resultado });
   },
 );

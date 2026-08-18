@@ -86,4 +86,11 @@ describe('gerarTurnosRodizio', () => {
   it('retorna vazio quando não há equipes configuradas', () => {
     expect(gerarTurnosRodizio({ ...regraDuasEquipes, equipes: [] }, '2026-01-01', '2026-01-31')).toEqual([]);
   });
+
+  it('o primeiro turno pode começar antes de "de" quando a periodicidade não bate com a janela — quem consome isso (ex.: exclusão pra regenerar) precisa considerar overlap, não só "inicio >= de"', () => {
+    const regraDezDias: RegraRodizio = { ...regraDuasEquipes, dataInicio: '2026-08-01', periodicidadeDias: 10, horaTroca: '08:00' };
+    const turnos = gerarTurnosRodizio(regraDezDias, '2026-08-15', '2026-09-14');
+    expect(turnos[0].inicioTurnoAtual).toBe('2026-08-11T08:00:00.000Z');
+    expect(turnos[0].inicioTurnoAtual < '2026-08-15').toBe(true);
+  });
 });

@@ -73,3 +73,44 @@ export async function gerarSobreavisoAutomatico(
 
   return { regraId, cicloRotulo, removidos, criados };
 }
+
+export interface ResultadoGeracaoSobreavisoGeral {
+  cicloRotulo: string;
+  regrasProcessadas: number;
+  regrasComErro: number;
+  totalCriados: number;
+  totalRemovidos: number;
+  detalhes: (ResultadoGeracaoSobreaviso & { regraNome: string })[];
+}
+
+/**
+ * Versão "geral" de gerarSobreavisoAutomatico: roda pra todas as regras ativas de uma vez. Uma
+ * regra mal configurada (ex.: sem equipes) não derruba as demais — só é contada em `regrasComErro`.
+ */
+export async function gerarSobreavisoAutomaticoTodasRegras(
+  db: D1Database,
+  cicloRotulo: string,
+  usuarioId: number,
+): Promise<ResultadoGeracaoSobreavisoGeral> {
+  const regras = await listarRegrasAtivas(db);
+  const detalhes: (ResultadoGeracaoSobreaviso & { regraNome: string })[] = [];
+  let regrasComErro = 0;
+
+  for (const regra of regras) {
+    try {
+      const resultado = await gerarSobreavisoAutomatico(db, regra.id, cicloRotulo, usuarioId);
+      detalhes.push({ ...resultado, regraNome: regra.nome });
+    } catch {
+      regrasComErro += 1;
+    }
+  }
+
+  return {
+    cicloRotulo,
+    regrasProcessadas: detalhes.length,
+    regrasComErro,
+    totalCriados: detalhes.reduce((soma, d) => soma + d.criados, 0),
+    totalRemovidos: detalhes.reduce((soma, d) => soma + d.removidos, 0),
+    detalhes,
+  };
+}

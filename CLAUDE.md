@@ -84,10 +84,20 @@ por linha em "Regras de rodízio automático" (`SobreavisoPage.tsx`): ele chama
 `shared/calculo/rodizio.ts::gerarTurnosRodizio` (mesma matemática pura de `calcularRodizio`, só que
 avançando turno a turno dentro de um ciclo) e persiste cada turno via
 `criarSobreavisoRodizio` (`origem = 'rodizio_automatico'`, `regra_id` setado — diferente de
-`criarSobreaviso`, que é só pra lançamento manual e sempre grava `origem = 'manual'`). É idempotente
-por design: cada execução primeiro apaga (`excluirSobreavisosGeradosDaRegra`) só o que aquela mesma
-regra já havia gerado automaticamente naquele ciclo antes de recriar — nunca toca em sobreaviso
-lançado manualmente. Pode rodar de novo à vontade se a regra mudar.
+`criarSobreaviso`, que é só pra lançamento manual e sempre grava `origem = 'manual'`). Existe também
+`gerarSobreavisoAutomaticoTodasRegras` (botão "Gerar sobreaviso" no topo da página, `POST
+/sobreaviso/regras/gerar-todas`), que roda a mesma coisa pra todas as regras ativas de uma vez —
+uma regra que falhar (ex.: sem equipes) só é contada em `regrasComErro`, não derruba as demais. É
+idempotente por design: cada execução primeiro apaga (`excluirSobreavisosGeradosDaRegra`) só o que
+aquela mesma regra já havia gerado automaticamente naquele ciclo antes de recriar — nunca toca em
+sobreaviso lançado manualmente. Pode rodar de novo à vontade se a regra mudar. **Cuidado ao mexer em
+`excluirSobreavisosGeradosDaRegra`**: o filtro é por sobreposição (`fim > de AND inicio <= ate`), não
+`inicio >= de` — quando a `periodicidadeDias` da regra não bate exatamente com a virada do ciclo
+(ex.: periodicidade de 10 dias), o primeiro turno do ciclo pode começar *antes* de `de`
+(`gerarTurnosRodizio` sempre retorna o turno que contém o cursor, que pode ter começado antes da
+janela pedida); um filtro só por `inicio` deixa esse turno pra trás a cada regeneração, acumulando
+duplicata silenciosamente (bug real já visto: duas linhas idênticas pro mesmo turno depois de rodar
+"gerar" duas vezes).
 
 O motor de inconsistências enxerga sobreaviso de duas formas — direto no colaborador ou herdado pela
 equipe dele — via `server/db/queries/sobreaviso.ts::listarSobreavisosDoColaborador(db, colaboradorId,
