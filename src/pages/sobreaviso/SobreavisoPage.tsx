@@ -25,6 +25,7 @@ type AlvoGeracao = { tipo: 'regra'; regra: SobreavisoRegra } | { tipo: 'geral' }
 interface TurnoGeradoView {
   regraNome?: string;
   equipeNome: string;
+  colaboradorNome: string | null;
   inicio: string;
   fim: string;
 }
@@ -349,22 +350,24 @@ export function SobreavisoPage() {
                       <tr>
                         {alvoGeracao.tipo === 'geral' && <th>Regra</th>}
                         <th>Equipe</th>
+                        <th>Colaborador</th>
                         <th>Início</th>
                         <th>Fim</th>
                       </tr>
                     </thead>
                     <tbody>
                       {resultadoGeracao.map((t, indice) => (
-                        <tr key={`${t.equipeNome}-${t.inicio}-${indice}`}>
+                        <tr key={`${t.colaboradorNome ?? t.equipeNome}-${t.inicio}-${indice}`}>
                           {alvoGeracao.tipo === 'geral' && <td>{t.regraNome}</td>}
                           <td>{t.equipeNome}</td>
+                          <td>{t.colaboradorNome ?? '—'}</td>
                           <td>{formatarDataHoraBR(t.inicio)}</td>
                           <td>{formatarDataHoraBR(t.fim)}</td>
                         </tr>
                       ))}
                       {resultadoGeracao.length === 0 && (
                         <tr>
-                          <td colSpan={alvoGeracao.tipo === 'geral' ? 4 : 3} className="data-table-empty">
+                          <td colSpan={alvoGeracao.tipo === 'geral' ? 5 : 4} className="data-table-empty">
                             Nenhum turno cai dentro desse ciclo.
                           </td>
                         </tr>

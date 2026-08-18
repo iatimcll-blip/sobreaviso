@@ -85,9 +85,16 @@ export async function listarSobreavisos(db: D1Database, filtro: FiltroSobreaviso
 }
 
 /**
- * Sobreavisos que se aplicam a um colaborador — lançados diretamente nele OU na equipe dele
- * (ex.: turno de rodízio automático gerado por equipe). Usado pelo motor de inconsistências, que
+ * Sobreavisos que se aplicam a um colaborador — lançados diretamente nele OU herdados da equipe dele
+ * quando o lançamento não tem colaborador específico (ex.: turno de rodízio gerado pra uma equipe
+ * sem membro cadastrado, ver gerarSobreavisoAutomatico). Usado pelo motor de inconsistências, que
  * precisa enxergar os dois casos ao checar CLT contra a escala real do colaborador.
+ *
+ * `equipe_id` sozinho não basta pra herdar: turnos de rodízio expandidos por membro (o caso comum)
+ * gravam colaborador_id **e** equipe_id na mesma linha pra rastreio — se a herança olhasse só
+ * `equipe_id`, o colaborador X passaria a enxergar também os lançamentos do colaborador Y só por
+ * dividirem equipe, mesmo cada um tendo o seu próprio registro. Por isso a herança por equipe exige
+ * `colaborador_id IS NULL` (só os lançamentos genéricos, sem dono, contam).
  */
 export async function listarSobreavisosDoColaborador(
   db: D1Database,
@@ -98,7 +105,8 @@ export async function listarSobreavisosDoColaborador(
 ): Promise<SobreavisoDetalhado[]> {
   const rows = await query<SobreavisoRow>(
     db,
-    `${SELECT} WHERE s.status != 'cancelado' AND s.fim >= ? AND s.inicio <= ? AND (s.colaborador_id = ? OR s.equipe_id = ?)
+    `${SELECT} WHERE s.status != 'cancelado' AND s.fim >= ? AND s.inicio <= ?
+       AND (s.colaborador_id = ? OR (s.equipe_id = ? AND s.colaborador_id IS NULL))
      ORDER BY s.inicio ASC`,
     [de, ate, colaboradorId, equipeId],
   );
@@ -170,17 +178,22 @@ export async function criarSobreaviso(db: D1Database, dado: SobreavisoEntrada, u
 
 export interface SobreavisoRodizioEntrada {
   equipeId: number;
+  colaboradorId?: number | null;
   regraId: number;
   inicio: string;
   fim: string;
 }
 
-/** Materializa um turno do rodízio automático como um lançamento real de sobreaviso (origem = 'rodizio_automatico'). */
+/**
+ * Materializa um turno do rodízio automático como um lançamento real de sobreaviso (origem =
+ * 'rodizio_automatico'). `equipeId` sempre setado (rastreia de qual rotação veio); `colaboradorId`
+ * setado quando o turno já foi expandido por membro da equipe (ver gerarSobreavisoAutomatico).
+ */
 export async function criarSobreavisoRodizio(db: D1Database, dado: SobreavisoRodizioEntrada, usuarioId: number | null): Promise<number> {
   const resultado = await execute(
     db,
-    `INSERT INTO sobreavisos (equipe_id, inicio, fim, origem, regra_id, criado_por) VALUES (?, ?, ?, 'rodizio_automatico', ?, ?)`,
-    [dado.equipeId, dado.inicio, dado.fim, dado.regraId, usuarioId],
+    `INSERT INTO sobreavisos (colaborador_id, equipe_id, inicio, fim, origem, regra_id, criado_por) VALUES (?, ?, ?, ?, 'rodizio_automatico', ?, ?)`,
+    [dado.colaboradorId ?? null, dado.equipeId, dado.inicio, dado.fim, dado.regraId, usuarioId],
   );
   return Number(resultado.meta.last_row_id);
 }

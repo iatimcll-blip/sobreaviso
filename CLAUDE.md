@@ -82,34 +82,45 @@ materializar o rodízio como lançamentos reais (necessário pra aparecer em rel
 pra ser checado pelo motor de CLT), use `gerarSobreavisoAutomatico`, acionado pelo botão de raio ⚡
 por linha em "Regras de rodízio automático" (`SobreavisoPage.tsx`): ele chama
 `shared/calculo/rodizio.ts::gerarTurnosRodizio` (mesma matemática pura de `calcularRodizio`, só que
-avançando turno a turno dentro de um ciclo) e persiste cada turno via
-`criarSobreavisoRodizio` (`origem = 'rodizio_automatico'`, `regra_id` setado — diferente de
-`criarSobreaviso`, que é só pra lançamento manual e sempre grava `origem = 'manual'`). Existe também
-`gerarSobreavisoAutomaticoTodasRegras` (botão "Gerar sobreaviso" no topo da página, `POST
+avançando turno a turno dentro de um ciclo) e, pra cada turno, expande a equipe de plantão em um
+lançamento **por colaborador membro ativo** dela (`server/db/queries/equipes.ts::listarMembrosAtivos`,
+via `equipe_membros` — não `colaboradores.equipe_id`), não uma linha única pra equipe toda — é isso
+que dá o "sobreaviso completo dos colaboradores" na lista de resultado. Cada linha persiste via
+`criarSobreavisoRodizio` com **`colaborador_id` e `equipe_id` setados ao mesmo tempo** (`origem =
+'rodizio_automatico'`, `regra_id` setado — diferente de `criarSobreaviso`, que é só pra lançamento
+manual e sempre grava `origem = 'manual'`). Se a equipe não tiver nenhum `equipe_membros` ativo, cai
+de volta pra uma linha equipe-scoped só (`colaborador_id` NULL) pra não perder a rotação
+silenciosamente — é o único caso em que uma linha de rodízio automático fica sem colaborador. Existe
+também `gerarSobreavisoAutomaticoTodasRegras` (botão "Gerar sobreaviso" no topo da página, `POST
 /sobreaviso/regras/gerar-todas`), que roda a mesma coisa pra todas as regras ativas de uma vez —
 uma regra que falhar (ex.: sem equipes) só é contada em `regrasComErro`, não derruba as demais. É
 idempotente por design: cada execução primeiro apaga (`excluirSobreavisosGeradosDaRegra`) só o que
 aquela mesma regra já havia gerado automaticamente naquele ciclo antes de recriar — nunca toca em
-sobreaviso lançado manualmente. Pode rodar de novo à vontade se a regra mudar. Ambas as funções
-devolvem a lista de `turnos`/`detalhes[].turnos` (`equipeId/equipeNome/inicio/fim`) — não só as
-contagens — porque `SobreavisoPage.tsx` mantém o modal aberto após gerar e renderiza essa lista numa
-tabela (`resultadoGeracao`) em vez de fechar direto; ao alterar a resposta dessas funções, mantenha
-esse campo, é consumido pela UI. **Cuidado ao mexer em
-`excluirSobreavisosGeradosDaRegra`**: o filtro é por sobreposição (`fim > de AND inicio <= ate`), não
-`inicio >= de` — quando a `periodicidadeDias` da regra não bate exatamente com a virada do ciclo
-(ex.: periodicidade de 10 dias), o primeiro turno do ciclo pode começar *antes* de `de`
-(`gerarTurnosRodizio` sempre retorna o turno que contém o cursor, que pode ter começado antes da
-janela pedida); um filtro só por `inicio` deixa esse turno pra trás a cada regeneração, acumulando
-duplicata silenciosamente (bug real já visto: duas linhas idênticas pro mesmo turno depois de rodar
-"gerar" duas vezes).
+sobreaviso lançado manualmente. Pode rodar de novo à vontade se a regra ou os membros da equipe
+mudarem. Ambas as funções devolvem a lista de `turnos`/`detalhes[].turnos`
+(`equipeId/equipeNome/colaboradorId/colaboradorNome/inicio/fim`) — não só as contagens — porque
+`SobreavisoPage.tsx` mantém o modal aberto após gerar e renderiza essa lista numa tabela
+(`resultadoGeracao`) em vez de fechar direto; ao alterar a resposta dessas funções, mantenha esse
+campo, é consumido pela UI. **Cuidado ao mexer em `excluirSobreavisosGeradosDaRegra`**: o filtro é
+por sobreposição (`fim > de AND inicio <= ate`), não `inicio >= de` — quando a `periodicidadeDias` da
+regra não bate exatamente com a virada do ciclo (ex.: periodicidade de 10 dias), o primeiro turno do
+ciclo pode começar *antes* de `de` (`gerarTurnosRodizio` sempre retorna o turno que contém o cursor,
+que pode ter começado antes da janela pedida); um filtro só por `inicio` deixa esse turno pra trás a
+cada regeneração, acumulando duplicata silenciosamente (bug real já visto: duas linhas idênticas pro
+mesmo turno depois de rodar "gerar" duas vezes).
 
 O motor de inconsistências enxerga sobreaviso de duas formas — direto no colaborador ou herdado pela
 equipe dele — via `server/db/queries/sobreaviso.ts::listarSobreavisosDoColaborador(db, colaboradorId,
-equipeId, de, ate)` (usada em `calcularColaborador`), que faz `WHERE colaborador_id = ? OR equipe_id
-= ?` explicitamente. **Não** volte a usar `listarSobreavisos({colaboradorId, ...})` ali — aquela
-função filtra por igualdade simples (AND entre os campos passados, não OR) e é a certa pra telas de
-listagem/filtro genérico, mas deixa de enxergar sobreaviso gerado por rodízio (que é sempre
-equipe-scoped, nunca tem `colaborador_id`).
+equipeId, de, ate)` (usada em `calcularColaborador`), que faz `WHERE colaborador_id = ? OR (equipe_id
+= ? AND colaborador_id IS NULL)`. **A condição `colaborador_id IS NULL` na herança por equipe não é
+opcional**: como os turnos gerados por rodízio agora gravam `colaborador_id` e `equipe_id` juntos na
+mesma linha (ver acima), um `OR equipe_id = ?` sem essa guarda faria o colaborador X enxergar também
+os lançamentos do colaborador Y só por dividirem equipe — mesmo cada um tendo o seu próprio registro
+individual (bug real já visto e corrigido: colaborador via 6 sobreavisos em vez dos 3 que eram dele).
+A herança por equipe deve pegar só os lançamentos genéricos, sem dono (o caso de fallback quando a
+equipe não tem `equipe_membros`). **Não** volte a usar `listarSobreavisos({colaboradorId, ...})` na
+engine de cálculo — aquela função filtra por igualdade simples (AND entre os campos passados, não OR)
+e é a certa pra telas de listagem/filtro genérico, mas não replica essa lógica de herança.
 
 ## Equipes e membros
 
